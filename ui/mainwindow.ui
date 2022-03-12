@@ -23,13 +23,13 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>提问加分-v0.9内部测试版</string>
+   <string>提问加分-v0.9.1内部测试版</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QLabel" name="teach_label">
     <property name="geometry">
      <rect>
-      <x>150</x>
+      <x>160</x>
       <y>110</y>
       <width>100</width>
       <height>50</height>
@@ -48,7 +48,7 @@
    <widget class="QLabel" name="stu_label">
     <property name="geometry">
      <rect>
-      <x>590</x>
+      <x>540</x>
       <y>110</y>
       <width>100</width>
       <height>50</height>
@@ -82,7 +82,7 @@
    <widget class="QListWidget" name="s_listWidget">
     <property name="geometry">
      <rect>
-      <x>600</x>
+      <x>540</x>
       <y>170</y>
       <width>300</width>
       <height>600</height>
@@ -96,12 +96,12 @@
    </widget>
    <widget class="QPushButton" name="saveButton">
     <property name="enabled">
-     <bool>false</bool>
+     <bool>true</bool>
     </property>
     <property name="geometry">
      <rect>
-      <x>1210</x>
-      <y>610</y>
+      <x>1280</x>
+      <y>170</y>
       <width>200</width>
       <height>80</height>
      </rect>
@@ -113,14 +113,14 @@
      </font>
     </property>
     <property name="text">
-     <string>确定</string>
+     <string>排队</string>
     </property>
    </widget>
    <widget class="QPushButton" name="outputButton">
     <property name="geometry">
      <rect>
-      <x>1210</x>
-      <y>210</y>
+      <x>990</x>
+      <y>170</y>
       <width>200</width>
       <height>80</height>
      </rect>
@@ -192,7 +192,7 @@
      </font>
     </property>
     <property name="text">
-     <string> </string>
+     <string>                           “一言”正在获取中······</string>
     </property>
    </widget>
    <widget class="QLabel" name="t_message_label">
@@ -211,37 +211,97 @@
      </font>
     </property>
     <property name="text">
-     <string> </string>
+     <string/>
     </property>
    </widget>
-   <widget class="QLineEdit" name="pw_lineEdit">
+   <widget class="QListWidget" name="ingList">
     <property name="geometry">
      <rect>
-      <x>335</x>
-      <y>780</y>
-      <width>931</width>
-      <height>61</height>
+      <x>1000</x>
+      <y>350</y>
+      <width>280</width>
+      <height>100</height>
      </rect>
     </property>
     <property name="font">
      <font>
-      <pointsize>16</pointsize>
+      <pointsize>20</pointsize>
      </font>
     </property>
-    <property name="inputMask">
-     <string/>
+   </widget>
+   <widget class="QListWidget" name="waitList">
+    <property name="geometry">
+     <rect>
+      <x>1000</x>
+      <y>470</y>
+      <width>280</width>
+      <height>300</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>20</pointsize>
+     </font>
+    </property>
+   </widget>
+   <widget class="QLabel" name="stu_label_2">
+    <property name="geometry">
+     <rect>
+      <x>900</x>
+      <y>350</y>
+      <width>100</width>
+      <height>50</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>宋体</family>
+      <pointsize>20</pointsize>
+     </font>
     </property>
     <property name="text">
-     <string/>
+     <string>ing：</string>
     </property>
-    <property name="maxLength">
-     <number>33</number>
+   </widget>
+   <widget class="QLabel" name="stu_label_3">
+    <property name="geometry">
+     <rect>
+      <x>900</x>
+      <y>480</y>
+      <width>100</width>
+      <height>50</height>
+     </rect>
     </property>
-    <property name="echoMode">
-     <enum>QLineEdit::Password</enum>
+    <property name="font">
+     <font>
+      <family>宋体</family>
+      <pointsize>20</pointsize>
+     </font>
     </property>
-    <property name="placeholderText">
-     <string>                          在这里输入密码</string>
+    <property name="text">
+     <string>wait：</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="saveButton_2">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>1350</x>
+      <y>370</y>
+      <width>160</width>
+      <height>71</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>宋体</family>
+      <pointsize>20</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Over</string>
     </property>
    </widget>
   </widget>
