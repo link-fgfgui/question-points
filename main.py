@@ -923,26 +923,24 @@ app.exec_()
 thread_2.exit()
 thread_1.exit()
 
-if False:
-    dic_up=requests.get('http://my.new.simpost.top/upload/fgfgui/update.txt?i=2').text
-    print(dic_up)
-    if dic_up['version']>version:
-        updateapp=QtWidgets.QApplication([])
-        up_FormWindow=QtWidgets.QWidget()
-        up_FormUi=Ui_updateForm()
-        up_FormUi.setupUi(up_FormWindow)
-        up_FormWindow.show()
-        for i in range(1,10):
-            up_FormUi.progressBar.setValue(i)
-# https://tenapi.cn/lanzou/?url=https://www.lanzous.com/itahfehy1bc&pwd=d17u
-        url='https://tenapi.cn/lanzou/?url='+dic_up["url"]
-        dic_up=requests.get(url).json()
-        up_FormUi.progressBar.setValue(20)
-        res=requests.get(dic_up['data']['url']).content
-        up_FormUi.progressBar.setValue(50)
-        with open(dic_up['data']['name'],'wb') as f:
-            f.write(res)
-        up_FormUi.progressBar.setValue(80)
-        time.sleep(2)
-        up_FormUi.progressBar.setValue(100)
-        updateapp.exec_()
+if os.name=='nt':#UPDATE
+    res=requests.get('https://link-fgfgui.github.io/question-points/update.json').json()
+    def checkup(length,ver,res=requests.get('https://link-fgfgui.github.io/question-points/update.json').json()):
+        for i in range(length):
+            try:
+                if int(res["version"][i]) > int(ver[i]):
+                    return True
+                elif len(ver)<len(res["version"]):
+                    return True
+            except:
+                pass
+        else:
+            return False
+    if checkup(5,version,res):
+            url=res["url"]
+            dic_up=requests.get(url).json()
+            res=requests.get(dic_up['data']['url']).content
+            with open(dic_up['data']['name'],'wb') as f:
+                f.write(res)
+    os.system(f"""start "" ./{dic_up['data']['name']}""")
+sys.exit(0)
