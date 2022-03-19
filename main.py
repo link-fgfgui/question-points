@@ -13,7 +13,14 @@ if os.path.exists('./config/config.json'):
         dic['onepoint']=10
 else:
     with open('./config/config.json','w',encoding='utf-8') as f:
-        dic={"name":[]}
+        dic={"names":[],"password":''}
+        if dic.get('password')==None:
+            dic['password']='0'
+        if dic.get('allpoint')==None:
+            dic['allpoint']=20
+        if dic.get('onepoint')==None:
+            dic['onepoint']=10
+        json.dump(dic,f,indent=4)
 canshu=sys.argv
 if len(canshu)<2:
     canshu.append('')
@@ -324,14 +331,20 @@ if canshu[1]=='old':
     app=QtWidgets.QApplication([])
     with open('./config/config.json','r',encoding='utf-8') as f:
         dic=json.load(f)
-    namelist=dic['names']
-    if namelist[-1]=='老师':
-        del namelist[-1]
-        del dic['names'][-1]
-        with open('./config/config.json','w',encoding='utf-8') as f:
-            json.dump(dic,f,indent=4)
-    password=dic['password']
-    todaytime=time.strftime("%Y-%m-%d",time.localtime())
+    try:
+        namelist=dic['names']
+        if namelist[-1]=='老师':
+            del namelist[-1]
+            del dic['names'][-1]
+            with open('./config/config.json','w',encoding='utf-8') as f:
+                json.dump(dic,f,indent=4)
+    except:
+        pass
+    try:
+        password=dic['password']
+        todaytime=time.strftime("%Y-%m-%d",time.localtime())
+    except:
+        pass
     try:
         dic[todaytime]
     except KeyError:
@@ -942,5 +955,5 @@ if os.name=='nt':#UPDATE
             res=requests.get(dic_up['data']['url']).content
             with open(dic_up['data']['name'],'wb') as f:
                 f.write(res)
-    os.system(f"""start "" ./{dic_up['data']['name']}""")
+            os.system(f"""start "" ./{dic_up['data']['name']}""")
 sys.exit(0)
