@@ -506,7 +506,7 @@ elif canshu[1]=='setconfig':
         os.system('setconfig.py')
     sys.exit()
 qmut_1,qmut_2=QtCore.QMutex(),QtCore.QMutex()
-version="0.9.1"
+version="0.9.2"
 waitlist,inglist=[],[]
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow): 
