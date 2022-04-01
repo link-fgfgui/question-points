@@ -1,31 +1,38 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-import json,os,time,requests,sys,threading
+import json, os, time, requests, sys, threading
+
 if not os.path.exists('./config'):
     os.mkdir('./config')
 if os.path.exists('./config/config.json'):
-    with open('./config/config.json','r') as f:
-        dic=json.load(f)
-    if dic.get('password')==None:
-        dic['password']='0'
-    if dic.get('allpoint')==None:
-        dic['allpoint']=20
-    if dic.get('onepoint')==None:
-        dic['onepoint']=10
+    with open('./config/config.json', 'r') as f:
+        dic = json.load(f)
+    if dic.get('password') is None:
+        dic['password'] = '0'
+    if dic.get('allpoint') is None:
+        dic['allpoint'] = 20
+    if dic.get('onepoint') is None:
+        dic['onepoint'] = 10
+    if dic.get('maxtell') is None:
+        dic['maxtell'] = 2
+    with open('./config/config.json', 'w') as f:
+        json.dump(dic, f, indent=4)
 else:
-    with open('./config/config.json','w',encoding='utf-8') as f:
-        dic={"names":[],"password":''}
-        if dic.get('password')==None:
-            dic['password']='0'
-        if dic.get('allpoint')==None:
-            dic['allpoint']=20
-        if dic.get('onepoint')==None:
-            dic['onepoint']=10
-        json.dump(dic,f,indent=4)
-canshu=sys.argv
-if len(canshu)<2:
+    with open('./config/config.json', 'w', encoding='utf-8') as f:
+        dic = {"names": [], "password": ''}
+        if dic.get('password') is None:
+            dic['password'] = '0'
+        if dic.get('allpoint') is None:
+            dic['allpoint'] = 20
+        if dic.get('onepoint') is None:
+            dic['onepoint'] = 10
+        json.dump(dic, f, indent=4)
+canshu = sys.argv
+if len(canshu) < 2:
     canshu.append('')
-if canshu[1]=='old':
-    version="0.9"
+if canshu[1] == 'old':
+    version = "0.9"
+
+
     class Ui_MainWindow(object):
         def setupUi(self, MainWindow):
             MainWindow.setObjectName("MainWindow")
@@ -132,6 +139,7 @@ if canshu[1]=='old':
             self.pw_lineEdit.textChanged.connect(checkpw)
             self.retranslateUi(MainWindow)
             QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
         def retranslateUi(self, MainWindow):
             _translate = QtCore.QCoreApplication.translate
             MainWindow.setWindowTitle(_translate("MainWindow", "提问加分-v0.9内部测试版"))
@@ -142,6 +150,8 @@ if canshu[1]=='old':
             self.hitokoto_label.setText(_translate("MainWindow", " "))
             self.t_message_label.setText(_translate("MainWindow", " "))
             self.pw_lineEdit.setPlaceholderText(_translate("MainWindow", "                          在这里输入密码"))
+
+
     class Ui_Form(object):
         def setupUi(self, Form):
             Form.setObjectName("Form")
@@ -173,10 +183,13 @@ if canshu[1]=='old':
             self.pushButton.clicked.connect(savefile)
             self.retranslateUi(Form)
             QtCore.QMetaObject.connectSlotsByName(Form)
+
         def retranslateUi(self, Form):
             _translate = QtCore.QCoreApplication.translate
             Form.setWindowTitle(_translate("Form", "导出&计算"))
             self.pushButton.setText(_translate("Form", "导出为文件"))
+
+
     class Ui_Dialog(object):
         def setupUi(self, Dialog):
             Dialog.setObjectName("Dialog")
@@ -218,165 +231,179 @@ if canshu[1]=='old':
             self.retranslateUi(Dialog)
             self.buttonBox.accepted.connect(Dialog.accept)
             QtCore.QMetaObject.connectSlotsByName(Dialog)
+
         def retranslateUi(self, Dialog):
             _translate = QtCore.QCoreApplication.translate
             Dialog.setWindowTitle(_translate("Dialog", "设置密码"))
             self.label.setText(_translate("Dialog", "请设置密码："))
+
+
     def checkpw():
-        if ui.pw_lineEdit.text()==password:
+        if ui.pw_lineEdit.text() == password:
             ui.saveButton.setDisabled(False)
         else:
             ui.saveButton.setDisabled(True)
+
+
     def output():
         global out
-        dic_t,dic_s,gong,nameg,alland={},{},[],[],[]
+        dic_t, dic_s, gong, nameg, alland = {}, {}, [], [], []
         for d in dic[todaytime]:
-            if d['tea']+d['stu'] in gong or d['tea']==d['stu']:
+            if d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
                 continue
-            gong.append(d['tea']+d['stu'])
+            gong.append(d['tea'] + d['stu'])
             if d['tea'] not in nameg:
                 nameg.append(d['tea'])
             if d['stu'] not in nameg:
                 nameg.append(d['stu'])
             try:
                 dic_t[d['tea']]
-                dic_t[d['tea']]=dic_t[d['tea']]+1
-                if dic_t[d['tea']]>onepoint:
-                    dic_t[d['tea']]=onepoint
+                dic_t[d['tea']] = dic_t[d['tea']] + 1
+                if dic_t[d['tea']] > onepoint:
+                    dic_t[d['tea']] = onepoint
             except KeyError:
-                dic_t[d['tea']]=2
+                dic_t[d['tea']] = 2
             try:
                 dic_s[d['stu']]
-                dic_s[d['stu']]=dic_s[d['stu']]+1
-                if dic_s[d['stu']]>onepoint:
-                    dic_s[d['stu']]=onepoint
+                dic_s[d['stu']] = dic_s[d['stu']] + 1
+                if dic_s[d['stu']] > onepoint:
+                    dic_s[d['stu']] = onepoint
             except KeyError:
-                dic_s[d['stu']]=2
-        out=todaytime+'\n\n'
+                dic_s[d['stu']] = 2
+        out = todaytime + '\n\n'
         for n in namelist:
             if n == '老师':
                 continue
             if n not in nameg:
                 continue
-            if dic_t.get(n)==None:
-                tea_count=0
+            if dic_t.get(n) == None:
+                tea_count = 0
             else:
-                tea_count=dic_t.get(n)
-            if dic_s.get(n)==None:
-                stu_count=0
+                tea_count = dic_t.get(n)
+            if dic_s.get(n) == None:
+                stu_count = 0
             else:
-                stu_count=dic_s.get(n)
-            if tea_count+stu_count>allpoint:
-                point=allpoint
+                stu_count = dic_s.get(n)
+            if tea_count + stu_count > allpoint:
+                point = allpoint
             else:
-                point=tea_count+stu_count
-            out=out+n+'+'+str(point)+'分\n'
+                point = tea_count + stu_count
+            out = out + n + '+' + str(point) + '分\n'
         FormWindow.show()
         FormUi.textBrowser.setText(out)
+
+
     def save():
         global dic
-        t=int(time.time()//1)
-        stu=namelist[ui.s_listWidget.currentIndex().row()]
-        tea=namelist[ui.t_listWidget.currentIndex().row()]
-        dic[todaytime].append({'time':t,'stu':stu,'tea':tea})
-        with open('./config/config.json','w') as f:
-            json.dump(dic,f,indent=4)
-            msg_box =QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '提示', '记录成功！')
+        t = int(time.time() // 1)
+        stu = namelist[ui.s_listWidget.currentIndex().row()]
+        tea = namelist[ui.t_listWidget.currentIndex().row()]
+        dic[todaytime].append({'time': t, 'stu': stu, 'tea': tea})
+        with open('./config/config.json', 'w') as f:
+            json.dump(dic, f, indent=4)
+            msg_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '提示', '记录成功！')
             msg_box.exec_()
+
+
     def changehitokoto():
         while True:
             while True:
                 try:
-                    hitokoto_dic=requests.get('https://v1.hitokoto.cn/?c=i&c=d&encode=json&max_length=16').json()
+                    hitokoto_dic = requests.get('https://v1.hitokoto.cn/?c=i&c=d&encode=json&max_length=16').json()
                     if '/' in hitokoto_dic["from"]:
-                        y=hitokoto_dic["from"].find('/')
-                        hitokoto_dic["from"]=hitokoto_dic["from"][:y]
-                        while hitokoto_dic["from"][-1]==' ':
-                            hitokoto_dic["from"]=hitokoto_dic["from"][:-2]
-                    if hitokoto_dic["from"]==None:
-                        hitokoto_dic["from"]='佚名'
-                    if hitokoto_dic["from_who"]==None:
-                        hitokoto_dic["from"]='佚名'
-                    hitokoto=hitokoto_dic["hitokoto"]+'—'+str(hitokoto_dic["from"])+' '+str(hitokoto_dic["from_who"])
-                    if len(hitokoto)<20:
-                        hitokoto=('  '*10)+hitokoto
+                        y = hitokoto_dic["from"].find('/')
+                        hitokoto_dic["from"] = hitokoto_dic["from"][:y]
+                        while hitokoto_dic["from"][-1] == ' ':
+                            hitokoto_dic["from"] = hitokoto_dic["from"][:-2]
+                    if hitokoto_dic["from"] == None:
+                        hitokoto_dic["from"] = '佚名'
+                    if hitokoto_dic["from_who"] == None:
+                        hitokoto_dic["from"] = '佚名'
+                    hitokoto = hitokoto_dic["hitokoto"] + '—' + str(hitokoto_dic["from"]) + ' ' + str(
+                        hitokoto_dic["from_who"])
+                    if len(hitokoto) < 20:
+                        hitokoto = ('  ' * 10) + hitokoto
                     ui.hitokoto_label.setText(hitokoto)
                     ui.hitokoto_label.setToolTip(hitokoto_dic['uuid'])
                     break
                 except:
                     pass
             time.sleep(150)
+
+
     def savefile():
         try:
-            filePath=QtWidgets.QFileDialog.getSaveFileName(None,"请选择保存路径",'./','txt Flies(*.txt)')[0]
-            outfile=out
-            outfile=outfile+'\n\n\n\n记录:\n'
+            filePath = QtWidgets.QFileDialog.getSaveFileName(None, "请选择保存路径", './', 'txt Flies(*.txt)')[0]
+            outfile = out
+            outfile = outfile + '\n\n\n\n记录:\n'
             for d in dic[todaytime]:
-                outfile=outfile+f"""{time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(d['time']))} {d['tea']} 教 {d['stu']}\n"""
-            with open(filePath,'w') as f:
+                outfile = outfile + f"""{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(d['time']))} {d['tea']} 教 {d['stu']}\n"""
+            with open(filePath, 'w') as f:
                 f.write(outfile)
-            msg_box =QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '信息', 'Successful')
+            msg_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '信息', 'Successful')
             msg_box.exec_()
         except:
-            msg_box =QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '失败！')
+            msg_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '失败！')
             msg_box.exec_()
+
+
     if not os.path.exists('./config'):
         os.mkdir('./config')
     if not os.path.exists('./config/config.json'):
-        a=QtWidgets.QApplication([])
-        msg=QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '没有找到配置文件！')
+        a = QtWidgets.QApplication([])
+        msg = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '没有找到配置文件！')
         msg.show()
         a.exec_()
         sys.exit()
-    app=QtWidgets.QApplication([])
-    with open('./config/config.json','r',encoding='utf-8') as f:
-        dic=json.load(f)
+    app = QtWidgets.QApplication([])
+    with open('./config/config.json', 'r', encoding='utf-8') as f:
+        dic = json.load(f)
     try:
-        namelist=dic['names']
-        if namelist[-1]=='老师':
+        namelist = dic['names']
+        if namelist[-1] == '老师':
             del namelist[-1]
             del dic['names'][-1]
-            with open('./config/config.json','w',encoding='utf-8') as f:
-                json.dump(dic,f,indent=4)
+            with open('./config/config.json', 'w', encoding='utf-8') as f:
+                json.dump(dic, f, indent=4)
     except:
         pass
     try:
-        password=dic['password']
-        todaytime=time.strftime("%Y-%m-%d",time.localtime())
+        password = dic['password']
+        todaytime = time.strftime("%Y-%m-%d", time.localtime())
     except:
         pass
     try:
         dic[todaytime]
     except KeyError:
-        dic[todaytime]=[]
-        DialogWindow=QtWidgets.QDialog()
-        DialogUi=Ui_Dialog()
+        dic[todaytime] = []
+        DialogWindow = QtWidgets.QDialog()
+        DialogUi = Ui_Dialog()
         DialogUi.setupUi(DialogWindow)
-        while not DialogWindow.exec() or DialogUi.pw_lineEdit.text()=='':
-            msg_box =QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '请设置密码')
+        while not DialogWindow.exec() or DialogUi.pw_lineEdit.text() == '':
+            msg_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '请设置密码')
             msg_box.exec_()
-        password=DialogUi.pw_lineEdit.text()
-        dic['password']=password
-        with open('./config/config.json','w',encoding='utf-8') as f:
-            json.dump(dic,f,indent=4)
-    mainWindow=QtWidgets.QMainWindow()
-    ui=Ui_MainWindow()
+        password = DialogUi.pw_lineEdit.text()
+        dic['password'] = password
+        with open('./config/config.json', 'w', encoding='utf-8') as f:
+            json.dump(dic, f, indent=4)
+    mainWindow = QtWidgets.QMainWindow()
+    ui = Ui_MainWindow()
     ui.setupUi(mainWindow)
     ui.s_listWidget.addItems(namelist)
     namelist.append('老师')
     ui.t_listWidget.addItems(namelist)
-    FormWindow=QtWidgets.QWidget()
-    FormUi=Ui_Form()
+    FormWindow = QtWidgets.QWidget()
+    FormUi = Ui_Form()
     FormUi.setupUi(FormWindow)
-    thread = threading.Thread(target=changehitokoto,daemon=True)
+    thread = threading.Thread(target=changehitokoto, daemon=True)
     thread.start()
-    password=dic['password']
-    allpoint=dic['allpoint']
-    onepoint=dic['onepoint']
+    password = dic['password']
+    allpoint = dic['allpoint']
+    onepoint = dic['onepoint']
     mainWindow.show()
     app.exec_()
     sys.exit(0)
-elif canshu[1]=='debug':
+elif canshu[1] == 'debug':
     class Ui_debugForm(object):
         def setupUi(self, debugForm):
             debugForm.setObjectName("debugForm")
@@ -447,6 +474,7 @@ elif canshu[1]=='debug':
             self.retranslateUi(debugForm)
             self.tabWidget.setCurrentIndex(0)
             QtCore.QMetaObject.connectSlotsByName(debugForm)
+
         def retranslateUi(self, debugForm):
             _translate = QtCore.QCoreApplication.translate
             debugForm.setWindowTitle(_translate("debugForm", "Debug the program"))
@@ -459,52 +487,66 @@ elif canshu[1]=='debug':
             self.label_3.setText(_translate("debugForm", "All"))
             self.label_4.setText(_translate("debugForm", "One"))
             self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("debugForm", "value"))
+
+
     def sav():
         global dic
-        dic['password']=deui.lineEdit_3.text()
-        with open('./config/config.json','w') as f:
-            json.dump(dic,f,indent=4)
+        dic['password'] = deui.lineEdit_3.text()
+        with open('./config/config.json', 'w') as f:
+            json.dump(dic, f, indent=4)
+
+
     def sa():
-        with open('./config/config.json','w') as f:
-            json.dump(dic,f,indent=4)
+        with open('./config/config.json', 'w') as f:
+            json.dump(dic, f, indent=4)
+
+
     def add():
-        global dic,names
+        global dic, names
         dic['names'].append(deui.lineEdit.text())
         deui.listWidget.addItem(deui.lineEdit.text())
         sa()
+
+
     def delll():
-        global dic,names
-        xuan=deui.listWidget.currentIndex().row()
-        if xuan>=0:
+        global dic, names
+        xuan = deui.listWidget.currentIndex().row()
+        if xuan >= 0:
             del dic['names'][xuan]
             deui.listWidget.takeItem(xuan)
             sa()
+
+
     def saapoint():
-        global allpoint,dic
+        global allpoint, dic
         try:
-            num=int(deui.lineEdit_7.text())
-            dic['allpoint']=num
-            allpoint=num
+            num = int(deui.lineEdit_7.text())
+            dic['allpoint'] = num
+            allpoint = num
             sa()
         except:
             pass
+
+
     def saopoint():
-        global onepoint,dic
+        global onepoint, dic
         try:
-            num=int(deui.lineEdit_8.text())
-            dic['onepoint']=num
-            onepoint=num
+            num = int(deui.lineEdit_8.text())
+            dic['onepoint'] = num
+            onepoint = num
             sa()
         except:
             pass
-    debugapp=QtWidgets.QApplication([])
-    deform=QtWidgets.QWidget()
-    deui=Ui_debugForm()
+
+
+    debugapp = QtWidgets.QApplication([])
+    deform = QtWidgets.QWidget()
+    deui = Ui_debugForm()
     deui.setupUi(deform)
-    password=dic['password']
-    allpoint=dic['allpoint']
-    onepoint=dic['onepoint']
-    names=dic['names']
+    password = dic['password']
+    allpoint = dic['allpoint']
+    onepoint = dic['onepoint']
+    names = dic['names']
     deui.listWidget.addItems(names)
     deui.lineEdit_2.setText(str(password))
     deui.lineEdit_7.setText(str(allpoint))
@@ -512,17 +554,19 @@ elif canshu[1]=='debug':
     deform.show()
     debugapp.exec_()
     sys.exit(0)
-elif canshu[1]=='setconfig':
-    if os.path.exists('./setconfig.exe') and os.name=='nt':
+elif canshu[1] == 'setconfig':
+    if os.path.exists('./setconfig.exe') and os.name == 'nt':
         os.system('start "" ./setconfig.exe')
     elif os.path.exists('./setconfig.py'):
         os.system('setconfig.py')
     sys.exit()
-qmut_1,qmut_2=QtCore.QMutex(),QtCore.QMutex()
-version="0.9.2"
-waitlist,inglist=[],[]
+qmut_1, qmut_2 = QtCore.QMutex(), QtCore.QMutex()
+version = "0.9.2"
+waitlist, inglist = [], []
+
+
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow): 
+    def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1600, 900)
         MainWindow.setMinimumSize(QtCore.QSize(1600, 900))
@@ -649,12 +693,16 @@ class Ui_MainWindow(object):
         self.t_listWidget.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.ingList.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.waitList.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.label = QtWidgets.QLabel(self.centralwidget)
+        self.label.setGeometry(QtCore.QRect(30, 820, 72, 15))
+        self.label.setObjectName("label")
         self.saveButton.clicked.connect(addtowaitlist)
         self.outputButton.clicked.connect(output)
         self.saveButton_2.clicked.connect(stopandsave)
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "提问加分-v0.9.1内部测试版"))
@@ -666,6 +714,9 @@ class Ui_MainWindow(object):
         self.stu_label_2.setText(_translate("MainWindow", "ing："))
         self.stu_label_3.setText(_translate("MainWindow", "wait："))
         self.saveButton_2.setText(_translate("MainWindow", "Over"))
+        self.label.setText(_translate("MainWindow", "By link"))
+
+
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
@@ -697,10 +748,13 @@ class Ui_Form(object):
         self.pushButton.clicked.connect(savefile)
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
+
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
         Form.setWindowTitle(_translate("Form", "导出&计算"))
         self.pushButton.setText(_translate("Form", "导出为文件"))
+
+
 class Ui_updateForm(object):
     def setupUi(self, updateForm):
         updateForm.setObjectName("updateForm")
@@ -721,131 +775,149 @@ class Ui_updateForm(object):
         self.progressBar.setObjectName("progressBar")
         self.retranslateUi(updateForm)
         QtCore.QMetaObject.connectSlotsByName(updateForm)
+
     def retranslateUi(self, updateForm):
         _translate = QtCore.QCoreApplication.translate
         updateForm.setWindowTitle(_translate("updateForm", "更新"))
         self.label.setText(_translate("updateForm", "更新ing ..........."))
+
+
 def output():
     global out
-    dic_t,dic_s,gong,nameg,alland={},{},[],[],[]
+    dic_t, dic_s, gong, nameg, alland = {}, {}, [], [], []
     for d in dic[todaytime]:
-        if d['tea']=='老师':
+        if d['tea'] == '老师':
             pass
-        elif d['tea']+d['stu'] in gong or d['tea']==d['stu']:
+        elif d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
             continue
-        gong.append(d['tea']+d['stu'])
+        gong.append(d['tea'] + d['stu'])
         if d['tea'] not in nameg:
             nameg.append(d['tea'])
         if d['stu'] not in nameg:
             nameg.append(d['stu'])
         try:
             dic_t[d['tea']]
-            dic_t[d['tea']]=dic_t[d['tea']]+1
-            if dic_t[d['tea']]>onepoint:
-                dic_t[d['tea']]=onepoint
+            dic_t[d['tea']] = dic_t[d['tea']] + 1
+            if dic_t[d['tea']] > onepoint:
+                dic_t[d['tea']] = onepoint
         except KeyError:
-            dic_t[d['tea']]=2
+            dic_t[d['tea']] = 2
         try:
             dic_s[d['stu']]
-            dic_s[d['stu']]=dic_s[d['stu']]+1
-            if dic_s[d['stu']]>onepoint:
-                dic_s[d['stu']]=onepoint
+            dic_s[d['stu']] = dic_s[d['stu']] + 1
+            if dic_s[d['stu']] > onepoint:
+                dic_s[d['stu']] = onepoint
         except KeyError:
-            dic_s[d['stu']]=2
-    out=todaytime+'\n\n'
+            dic_s[d['stu']] = 2
+    out = todaytime + '\n\n'
     for n in namelist:
         if n == '老师':
             continue
         if n not in nameg:
             continue
-        if dic_t.get(n)==None:
-            tea_count=0
+        if dic_t.get(n) == None:
+            tea_count = 0
         else:
-            tea_count=dic_t.get(n)
-        if dic_s.get(n)==None:
-            stu_count=0
+            tea_count = dic_t.get(n)
+        if dic_s.get(n) == None:
+            stu_count = 0
         else:
-            stu_count=dic_s.get(n)
-        if tea_count+stu_count>allpoint:
-            point=allpoint
+            stu_count = dic_s.get(n)
+        if tea_count + stu_count > allpoint:
+            point = allpoint
         else:
-            point=tea_count+stu_count
-        out=out+n+'+'+str(point)+'分\n'
+            point = tea_count + stu_count
+        out = out + n + '+' + str(point) + '分\n'
     FormWindow.show()
     FormUi.textBrowser.setText(out)
+
+
 def stopandsave():
-    xuan=ui.ingList.currentIndex().row()
-    if xuan>=0:
-            qmut_1.lock()
-            dic=inglist[xuan]
-            del inglist[xuan]
-            ui.ingList.takeItem(xuan)
-            save(dic)
-            msgBox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '提示','保存成功！',QtWidgets.QMessageBox.Ok)
-            msgBox.setDefaultButton(QtWidgets.QMessageBox.Ok)
-            msgBox.button(QtWidgets.QMessageBox.Ok).animateClick(1000 * 5)
-            msgBox.exec()
-            qmut_1.unlock()
+    xuan = ui.ingList.currentIndex().row()
+    if xuan >= 0:
+        qmut_1.lock()
+        dic = inglist[xuan]
+        del inglist[xuan]
+        ui.ingList.takeItem(xuan)
+        save(dic)
+        msgBox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '提示', '保存成功！', QtWidgets.QMessageBox.Ok)
+        msgBox.setDefaultButton(QtWidgets.QMessageBox.Ok)
+        msgBox.button(QtWidgets.QMessageBox.Ok).animateClick(1000 * 5)
+        msgBox.exec()
+        qmut_1.unlock()
+
+
 def addtowaitlist():
-    global waitlist,inglist
-    t=int(time.time()//1)
-    stu=namelist[ui.s_listWidget.currentIndex().row()]
-    if ui.t_listWidget.currentIndex().row()>=len(namelist):
-        tea='老师'
+    global waitlist, inglist
+    t = int(time.time() // 1)
+    stu = namelist[ui.s_listWidget.currentIndex().row()]
+    if ui.t_listWidget.currentIndex().row() >= len(namelist):
+        tea = '老师'
     else:
-        tea=namelist[ui.t_listWidget.currentIndex().row()]
-    qmut_1.lock() 
-    dic_wait=({'time':t,'stu':stu,'tea':tea})
+        tea = namelist[ui.t_listWidget.currentIndex().row()]
+    qmut_1.lock()
+    dic_wait = ({'time': t, 'stu': stu, 'tea': tea})
     waitlist.append(dic_wait)
-    ui.waitList.addItem(tea+stu)
+    ui.waitList.addItem(tea + stu)
     qmut_1.unlock()
+
+
 class MyObject(QtCore.QObject):
     global thread_1
+
     def __init__(self):
         global thread_1
         super().__init__()
-        thread_1=Thread_1()
+        thread_1 = Thread_1()
         thread_1.start()
         thread_1._Signal.connect(self.sendmsg)
+
     def sendmsg(self):
-        msgBox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '提示',tex,QtWidgets.QMessageBox.Ok)
+        msgBox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '提示', tex, QtWidgets.QMessageBox.Ok)
         msgBox.setDefaultButton(QtWidgets.QMessageBox.Ok)
         msgBox.button(QtWidgets.QMessageBox.Ok).animateClick(1000 * 10)
         msgBox.exec()
+
+
 class Thread_1(QtCore.QThread):
-    global tex,waitlist,inglist
+    global tex, waitlist, inglist
     _Signal = QtCore.pyqtSignal()
+
     def __init__(self):
         global tex
         super().__init__()
- 
+
     def run(self):
-        global tex,waitlist,inglist
+        global tex, waitlist, inglist
         while True:
-            if len(inglist)<2 and len(waitlist)>0:
+            if len(inglist) < 2 and len(waitlist) > 0:
                 qmut_1.lock()
-                dic1=waitlist[0]
+                dic1 = waitlist[0]
                 inglist.append(dic1)
                 del waitlist[0]
                 ui.waitList.takeItem(0)
-                ui.ingList.addItem(dic1['tea']+dic1['stu'])
-                tex='请{}组开始讲题！'.format(dic1['tea']+dic1['stu'])
+                ui.ingList.addItem(dic1['tea'] + dic1['stu'])
+                tex = '请{}组开始讲题！'.format(dic1['tea'] + dic1['stu'])
                 self._Signal.emit()
-                inglist[-1]['start']=time.perf_counter()
-                qmut_1.unlock() 
+                inglist[-1]['start'] = time.perf_counter()
+                qmut_1.unlock()
             for d in inglist:
-                if time.perf_counter()-d['start']>=300:
-                    qmut_1.lock() 
-                    tex='请{}组回到教室！'.format(d['tea']+d['stu'])
-                    xuan=inglist.index(d)
+                if time.perf_counter() - d['start'] >= 300:
+                    qmut_1.lock()
+                    tex = '请{}组回到教室！'.format(d['tea'] + d['stu'])
+                    xuan = inglist.index(d)
                     inglist.remove(d)
                     ui.ingList.takeItem(xuan)
                     self._Signal.emit()
                     save(d)
                     qmut_1.unlock()
             time.sleep(0.8)
+
+
 def waitforsave():
     pass
+
+
 def save(d):
     global dic
     # t=int(time.time()//1)
@@ -855,105 +927,115 @@ def save(d):
     # else:
     #     tea=namelist[ui.t_listWidget.currentIndex().row()]
     dic[todaytime].append(d)
-    with open('./config/config.json','w') as f:
-        json.dump(dic,f,indent=4)
+    with open('./config/config.json', 'w') as f:
+        json.dump(dic, f, indent=4)
+
+
 class Thread_2(QtCore.QThread):
     def __init__(self):
         super().__init__()
+
     def run(self):
         while True:
             while True:
                 try:
-                    hitokoto_dic=requests.get('https://v1.hitokoto.cn/?c=i&c=d&encode=json&max_length=16').json()
+                    hitokoto_dic = requests.get('https://v1.hitokoto.cn/?c=i&encode=json&max_length=16').json()
                     if '/' in hitokoto_dic["from"]:
-                        y=hitokoto_dic["from"].find('/')
-                        hitokoto_dic["from"]=hitokoto_dic["from"][:y]
-                        while hitokoto_dic["from"][-1]==' ':
-                            hitokoto_dic["from"]=hitokoto_dic["from"][:-2]
-                    if hitokoto_dic["from"]==None:
-                        hitokoto_dic["from"]='佚名'
-                    if hitokoto_dic["from_who"]==None:
-                        hitokoto_dic["from"]='佚名'
-                    hitokoto=hitokoto_dic["hitokoto"]+'—'+str(hitokoto_dic["from"])+' '+str(hitokoto_dic["from_who"])
-                    if len(hitokoto)<20:
-                        hitokoto=('  '*10)+hitokoto
+                        y = hitokoto_dic["from"].find('/')
+                        hitokoto_dic["from"] = hitokoto_dic["from"][:y]
+                        while hitokoto_dic["from"][-1] == ' ':
+                            hitokoto_dic["from"] = hitokoto_dic["from"][:-2]
+                    if hitokoto_dic["from"] == None:
+                        hitokoto_dic["from"] = '佚名'
+                    if hitokoto_dic["from_who"] == None:
+                        hitokoto_dic["from"] = '佚名'
+                    hitokoto = hitokoto_dic["hitokoto"] + '—《' + str(hitokoto_dic["from"]) + '》 ' + str(
+                        hitokoto_dic["from_who"])
+                    if len(hitokoto) < 20:
+                        hitokoto = ('  ' * 10) + hitokoto
                     ui.hitokoto_label.setText(hitokoto)
                     ui.hitokoto_label.setToolTip(hitokoto_dic['uuid'])
                     break
                 except:
                     pass
             time.sleep(150)
-def changehitokoto():
-    pass
+
+
 def savefile():
     try:
-        filePath=QtWidgets.QFileDialog.getSaveFileName(None,"请选择保存路径",'./','txt Flies(*.txt)')[0]
-        outfile=out
-        outfile=outfile+'\n\n\n\n记录:\n'
+        filePath = QtWidgets.QFileDialog.getSaveFileName(None, "请选择保存路径", './', 'txt Flies(*.txt)')[0]
+        outfile = out
+        outfile = outfile + '\n\n\n\n记录:\n'
         for d in dic[todaytime]:
-            outfile=outfile+f"""{time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(d['time']))} {d['tea']} 教 {d['stu']}\n"""
-        with open(filePath,'w') as f:
+            outfile = outfile + f"""{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(d['time']))} {d['tea']} 教 {d['stu']}\n"""
+        with open(filePath, 'w') as f:
             f.write(outfile)
-        msg_box =QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '信息', 'Successful')
+        msg_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Information, '信息', 'Successful')
         msg_box.exec_()
     except:
-        msg_box =QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '失败！')
+        msg_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, '错误', '失败！')
         msg_box.exec_()
-app=QtWidgets.QApplication([])
-with open('./config/config.json','r',encoding='utf-8') as f:
-    dic=json.load(f)
-if dic['names']=='老师':
+
+
+app = QtWidgets.QApplication([])
+with open('./config/config.json', 'r', encoding='utf-8') as f:
+    dic = json.load(f)
+if dic['names'] == '老师':
     del dic['names'][-1]
-    with open('./config/config.json','w',encoding='utf-8') as f:
-        json.dump(dic,f,indent=4)
-with open('./config/config.json','r',encoding='utf-8') as f:
-    dic=json.load(f)
-namelist=dic['names']
-todaytime=time.strftime("%Y-%m-%d",time.localtime())
+    with open('./config/config.json', 'w', encoding='utf-8') as f:
+        json.dump(dic, f, indent=4)
+with open('./config/config.json', 'r', encoding='utf-8') as f:
+    dic = json.load(f)
+namelist = dic['names']
+todaytime = time.strftime("%Y-%m-%d", time.localtime())
 try:
     dic[todaytime]
 except KeyError:
-    dic[todaytime]=[]
-    with open('./config/config.json','w',encoding='utf-8') as f:
-        json.dump(dic,f,indent=4)
-mainWindow=QtWidgets.QMainWindow()
-ui=Ui_MainWindow()
+    dic[todaytime] = []
+    with open('./config/config.json', 'w', encoding='utf-8') as f:
+        json.dump(dic, f, indent=4)
+mainWindow = QtWidgets.QMainWindow()
+ui = Ui_MainWindow()
 ui.setupUi(mainWindow)
 ui.s_listWidget.addItems(namelist)
 ui.t_listWidget.addItems(namelist)
 ui.t_listWidget.addItem('老师')
-FormWindow=QtWidgets.QWidget()
-FormUi=Ui_Form()
+FormWindow = QtWidgets.QWidget()
+FormUi = Ui_Form()
 FormUi.setupUi(FormWindow)
-password=dic['password']
-allpoint=dic['allpoint']
-onepoint=dic['onepoint']
-thread_2=Thread_2()
+password = dic['password']
+allpoint = dic['allpoint']
+onepoint = dic['onepoint']
+thread_2 = Thread_2()
 thread_2.start()
-obj=MyObject()
+obj = MyObject()
 mainWindow.show()
 app.exec_()
 thread_2.exit()
 thread_1.exit()
 
-if os.name=='nt':#UPDATE
-    res=requests.get('https://link-fgfgui.github.io/question-points/update.json').json()
-    def checkup(length,ver,res=requests.get('https://link-fgfgui.github.io/question-points/update.json').json()):
+if os.name == 'nt':  # UPDATE
+    res = requests.get('https://link-fgfgui.github.io/question-points/update.json').json()
+
+
+    def checkup(length, ver, res=requests.get('https://link-fgfgui.github.io/question-points/update.json').json()):
         for i in range(length):
             try:
                 if int(res["version"][i]) > int(ver[i]):
                     return True
-                elif len(ver)<len(res["version"]):
+                elif len(ver) < len(res["version"]):
                     return True
             except:
                 pass
         else:
             return False
-    if checkup(5,version,res):
-            url=res["url"]
-            dic_up=requests.get(url).json()
-            res=requests.get(dic_up['data']['url']).content
-            with open(dic_up['data']['name'],'wb') as f:
-                f.write(res)
-            os.system(f"""start "" ./{dic_up['data']['name']}""")
+
+
+    if checkup(5, version, res):
+        url = res["url"]
+        dic_up = requests.get(url).json()
+        res = requests.get(dic_up['data']['url']).content
+        with open(dic_up['data']['name'], 'wb') as f:
+            f.write(res)
+        os.system(f"""start "" ./{dic_up['data']['name']}""")
 sys.exit(0)
