@@ -28,6 +28,9 @@
   <property name="windowTitle">
    <string>导出&amp;计算</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
   <widget class="QTextBrowser" name="textBrowser">
    <property name="geometry">
     <rect>
@@ -36,6 +39,9 @@
      <width>600</width>
      <height>400</height>
     </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">border-radius:5px;</string>
    </property>
   </widget>
   <widget class="QPushButton" name="pushButton">
@@ -55,11 +61,49 @@
      <bold>false</bold>
     </font>
    </property>
+   <property name="styleSheet">
+    <string notr="true"/>
+   </property>
    <property name="text">
     <string>导出为文件</string>
    </property>
   </widget>
+  <widget class="QPushButton" name="pushButton_2">
+   <property name="geometry">
+    <rect>
+     <x>750</x>
+     <y>0</y>
+     <width>50</width>
+     <height>50</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">.QPushButton{image: url(:/a/close.ico);border-radius: 10px;}QPushButton:hover {background-color: rgb(139, 139, 139);}</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
  </widget>
- <resources/>
- <connections/>
+ <resources>
+  <include location="../config/a.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>pushButton_2</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>781</x>
+     <y>36</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>611</x>
+     <y>-9</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
