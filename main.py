@@ -1,5 +1,8 @@
-from PyQt5 import QtNetwork
-import sys,os
+from PyQt5 import QtNetwork, QtWidgets, QtCore, QtGui, Qt, QtMultimedia
+import sys, os, traceback, random, json, time, requests, hashlib, copy, re, gc
+
+QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+app = QtWidgets.QApplication(sys.argv)
 serverName = 'question-point'
 socket = QtNetwork.QLocalSocket()
 socket.connectToServer(serverName)
@@ -7,45 +10,34 @@ if socket.waitForConnected(500):
     sys.exit(-1)
 localServer = QtNetwork.QLocalServer()
 localServer.listen(serverName)
-from PyQt5 import QtCore, QtGui, QtWidgets, Qt,QtWebEngineWidgets
-import json, os, time, requests, sys, hashlib
+s = requests.session()
+s.mount('https://', requests.adapters.HTTPAdapter(
+    max_retries=requests.packages.urllib3.util.Retry(total=5, method_whitelist=frozenset(['GET', 'POST']))))
 
-if 'autologin' in sys.argv:
+if os.name == 'nt':
+    file = os.environ['APPDATA'].replace('\\', '/') + '/question-points'
+if os.name == 'posix':
     try:
-        c=sys.argv
-        isAuto=True
-        username=c[c.index('autologin')+1]
-        password=c[c.index('autologin')+2]
-    except IndexError:
-        isAuto = False
-        username, password = None, None
-else:
-    isAuto=False
-    username,password=None,None
-print(isAuto,username,password)
-# 如果连接成功，表明server已经存在，当前已有实例在运行
-
-if os.name=='nt':
-    file = os.environ['APPDATA'].replace('\\','/') + '/question-points'
-if os.name=='posix':
-    try:
-        file=os.environ['HOME']+'/.question-points'
+        file = os.environ['HOME'] + '/.question-points'
     except:
-        file='.'
-# "C:/Users/link's computer/AppData/Roaming"
+        file = '.'
 
-# 没有实例运行，创建服务器
-
-
-if file!='.':
+if file != '.':
     if not os.path.exists(file):
         os.mkdir(file)
+if not os.path.exists(file + "/imgtemp"):
+    os.mkdir(file + "/imgtemp")
+if not os.path.exists(file + "/imgtemp2"):
+    os.mkdir(file + "/imgtemp2")
+if not os.path.exists(file + "/dumps"):
+    os.mkdir(file + "/dumps")
+if not os.path.exists(file + "/errorlogs"):
+    os.mkdir(file + "/errorlogs")
 if not os.path.exists(file + '/config'):
     os.mkdir(file + '/config')
 if os.path.exists(file + '/config/config.json'):
     with open(file + '/config/config.json', 'r') as f:
         dic = json.load(f)
-        dic_old=dic
     if dic.get('password') is None:
         dic['password'] = '0'
     if dic.get('allpoint') is None:
@@ -62,10 +54,12 @@ if os.path.exists(file + '/config/config.json'):
         dic['countmode'] = '0'
     if dic.get("onceadd") is None:
         dic["onceadd"] = 1
+    if dic.get("remember") is None:
+        dic['remember'] = []
     if dic.get("color") is None:
         dic["color"] = "rgb(0,85,255);"
-    with open(file + '/config/config.json', 'w') as f:
-        json.dump(dic, f, indent=4)
+    if dic.get("outTime") is None:
+        dic["outTime"] = 180
 else:
     with open(file + '/config/config.json', 'w', encoding='utf-8') as f:
         dic = {"names": [], "password": ''}
@@ -85,8 +79,12 @@ else:
             dic['countmode'] = "0"
         if dic.get("onceadd") is None:
             dic["onceadd"] = 1
+        if dic.get("remember") is None:
+            dic['remember'] = []
         if dic.get("color") is None:
             dic["color"] = "rgb(0,85,255);"
+        if dic.get("outTime") is None:
+            dic["outTime"] = 180
         json.dump(dic, f, indent=4)
 canshu = sys.argv
 if len(canshu) < 2:
@@ -149,7 +147,7 @@ if canshu[1] == 'debug':
             self.sa()
 
         def delll(self):
-            xuan = self.listWidget.currentIndex().row()
+            xuan = self.listWidget.currentRow()
             if xuan >= 0:
                 del self.dic['names'][xuan]
                 self.listWidget.takeItem(xuan)
@@ -420,9 +418,393 @@ elif canshu[1] == 'setconfig':
     elif os.path.exists('./setconfig.py'):
         os.system('setconfig.py')
     sys.exit()
-qmut_1, qmut_2 = QtCore.QMutex(), QtCore.QMutex()
+qmut_1, qmut_2, qmut_3 = QtCore.QMutex(), QtCore.QMutex(), QtCore.QMutex()
 version = "0.9.5"
 waitlist, inglist = [], []
+
+
+class Ui_ChooseClasses(QtWidgets.QWidget):
+    global dianpinId, namelist, stuDatas
+
+    def __init__(self):
+        super(Ui_ChooseClasses, self).__init__()
+        self.m_flag = False
+        self.setupUi(self)
+
+    def setupUi(self, Form):
+        Form.setObjectName("Form")
+        Form.resize(773, 488)
+        Form.setStyleSheet("QWidget{background-color: rgb(57, 167, 255);border-radius:5px;}")
+        Form.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        Form.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        self.listWidget = QtWidgets.QListWidget(Form)
+        self.listWidget.setGeometry(QtCore.QRect(10, 40, 761, 431))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(12)
+        self.listWidget.setFont(font)
+        self.listWidget.setAutoScrollMargin(16)
+        self.listWidget.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.listWidget.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.listWidget.setMovement(QtWidgets.QListView.Static)
+        self.listWidget.setFlow(QtWidgets.QListView.LeftToRight)
+        self.listWidget.setProperty("isWrapping", True)
+        self.listWidget.setWordWrap(False)
+        self.listWidget.setObjectName("listWidget")
+        self.listWidget.setSpacing(10)
+        self.listWidget.setStyleSheet(
+            "QListWidget:item{background-color: white;border: solid black 1px;border-radius: 5px;padding:20px;}")
+        self.label = QtWidgets.QLabel(Form)
+        self.label.setGeometry(QtCore.QRect(10, 10, 111, 21))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(12)
+        self.label.setFont(font)
+        self.label.setStyleSheet("color:rgb(255, 255, 255)")
+        self.label.setObjectName("label")
+        self.pushButton = QtWidgets.QPushButton(Form)
+        self.pushButton.setGeometry(QtCore.QRect(680, 0, 93, 28))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(12)
+        self.pushButton.setFont(font)
+        self.pushButton.setStyleSheet(
+            ".QPushButton{background-color:rgb(255, 255, 255);border: 1px solid #000;}.QPushButton:pressed{background-color: aqua;}\n"
+            "")
+        self.pushButton.setObjectName("pushButton")
+
+        self.retranslateUi(Form)
+        self.pushButton.clicked.connect(self.exlse)
+        self.listWidget.itemClicked.connect(self.showmainwindow)
+        # self.listWidget.itemClicked.connect()
+        QtCore.QMetaObject.connectSlotsByName(Form)
+
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Form"))
+        self.label.setText(_translate("Form", "请选择班级"))
+        self.pushButton.setText(_translate("Form", "取消"))
+
+    def exlse(self):
+        self.close()
+        loginui.hide()
+
+    def showmainwindow(self):
+        global dianpinId, namelist, stuDatas
+        x = self.listWidget.currentRow()
+        classId = classesList[x]["CI"]
+        x_csrf_token = \
+        re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
+        headers = {"Content-Type": "application/json; charset=UTF-8", "x-csrf-token": x_csrf_token,
+                   "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53",
+                   "x-requested-with": "XMLHttpRequest"}
+        datastr = json.dumps(
+            {"action": "MEDAL_FETCH_BY_CLASSROOM", "params": {"cid": classId, "originKey": "easicare-web"}})
+        self.res = s.post(
+            'https://care.seewo.com/app/apis.json?action=MEDAL_FETCH_BY_CLASSROOM&timestamp=1653650015349&isAjax=1',
+            data=datastr, headers=headers).json()
+        dianpinDataList = self.res['data']
+        self.dianpinId = ""
+        for d in dianpinDataList:
+            if d["name"] == "提问加分" and d['type'] == 1:
+                self.dianpinId = d["uid"]
+                break
+        else:
+            msgbox.TIP("没有找到‘提问加分’加分项，请添加后重试！", 3)
+            return
+        datastr = json.dumps(
+            {"action": "STUDENT_FETCH_LIST", "params": {"classroomId": classId, "originKey": "easicare-web"}})
+        self.res = s.post(
+            'https://care.seewo.com/app/apis.json?action=STUDENT_FETCH_LIST&timestamp=1653650015349&isAjax=1',
+            data=datastr, headers=headers).json()
+        stuDatas = {}
+        stuDataList = self.res['data']["students"]
+        namelist = []
+        ui.s_listWidget.clear()
+        ui.t_listWidget.clear()
+        msgbox.TIP("加载需要一定时间，请在关闭此对话框后稍等", 3)
+        for d in stuDataList:
+            if d["customAvatar"] != '':
+                Avatar = d["customAvatar"]
+            else:
+                Avatar = d["studentAvatar"]
+            namelist.append(d["studentName"])
+            stuDatas[d["studentName"]] = {"AVATAR": Avatar, "UID": d["uid"]}
+            item = QtWidgets.QListWidgetItem()
+            item2 = QtWidgets.QListWidgetItem()
+            item.setText(d["studentName"])
+            item2.setText(d["studentName"])
+            try:
+                if "http" in Avatar:
+                    photoRes = s.get(Avatar).content
+                    with open(file + '/imgtemp2/{}'.format(loginui.getPicName(Avatar)), 'wb') as f: f.write(photoRes)
+                    item.setIcon(QtGui.QIcon(file + '/imgtemp2/{}'.format(loginui.getPicName(Avatar))))
+                    item2.setIcon(QtGui.QIcon(file + '/imgtemp2/{}'.format(loginui.getPicName(Avatar))))
+            except BaseException as error:
+                traceback.print_exc(file=open(file + f"/errorlogs/{int(time.time() // 1)}.log", 'w'))
+            ui.s_listWidget.addItem(item)
+            ui.t_listWidget.addItem(item2)
+        ui.t_listWidget.addItem("老师")
+        ui.show()
+        self.close()
+        loginui.hide()
+
+
+class Ui_loginForm(QtWidgets.QWidget):
+    global dic, classesList
+
+    def __init__(self):
+        super(Ui_loginForm, self).__init__()
+        self.anim2 = None
+        self.anim = None
+        self.m_flag = False
+        self.getPicName = lambda zi: zi[zi.rfind('/') + 1:]
+        self.setupUi(self)
+        for i in dic['remember']:
+            item = QtWidgets.QListWidgetItem()
+            item.setIcon(QtGui.QIcon(file + '/imgtemp/{}'.format(self.getPicName(i["photoUrl"]))))
+            item.setText(i['NAME'])
+            item.setToolTip(i['USER'])
+            self.listWidget.addItem(item)
+
+    def setupUi(self, loginForm):
+        loginForm.setObjectName("loginForm")
+        loginForm.resize(934, 604)
+        loginForm.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        loginForm.setStyleSheet(
+            "QWidget{background-color: rgb(57, 167, 255);border-radius:5px;}.QLabel{color: rgb(255, 255, 255);}")
+        self.label = QtWidgets.QLabel(loginForm)
+        self.label.setGeometry(QtCore.QRect(730, 10, 201, 51))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(18)
+        self.label.setFont(font)
+        self.label.setStyleSheet("")
+        self.label.setObjectName("label")
+        self.formFrame = QtWidgets.QFrame(loginForm)
+        self.formFrame.setGeometry(QtCore.QRect(680, 10, 41, 41))
+        self.formFrame.setStyleSheet("image: url(./config/icon.png);")
+        self.formFrame.setObjectName("formFrame")
+        self.formLayout = QtWidgets.QFormLayout(self.formFrame)
+        self.formLayout.setObjectName("formLayout")
+        self.frame = QtWidgets.QFrame(loginForm)
+        self.frame.setGeometry(QtCore.QRect(90, 80, 300, 400))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(14)
+        self.frame.setFont(font)
+        self.frame.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.frame.setStyleSheet(
+            "QFrame{background-color: rgb(245, 245, 245);border-radius:5px;background-color: rgb(245, 245, 245)}.QLabel{color:rgb(0, 0, 0);}.QPushButton{border-radius:18px;color: rgb(255, 255, 255);}.QPushButton:pressed{border-radius:18px;color: rgb(255, 255, 255);background-color: rgb(0, 77, 231);}.QLineEdit{background-color: rgb(255, 255, 255);color: rgb(0, 0, 0);border-radius:5px;border-style:solid;border-color: rgb(83, 83, 83);border-width:1}.QLineEdit:hover{background-color: rgb(255, 255, 255);color: rgb(0, 0, 0);border-radius:5px;border-style:solid;border-color: rgb(0, 0, 255);border-width:2}")
+        self.frame.setObjectName("frame")
+        self.loginlabel = QtWidgets.QLabel(self.frame)
+        self.loginlabel.setGeometry(QtCore.QRect(10, 0, 111, 41))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(14)
+        self.loginlabel.setFont(font)
+        self.loginlabel.setStyleSheet("")
+        self.loginlabel.setObjectName("loginlabel")
+        self.lineEditusername = QtWidgets.QLineEdit(self.frame)
+        self.lineEditusername.setGeometry(QtCore.QRect(45, 70, 211, 41))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(10)
+        self.lineEditusername.setFont(font)
+        self.lineEditusername.setStyleSheet("")
+        self.lineEditusername.setObjectName("lineEditusername")
+        self.lineEditpassword = QtWidgets.QLineEdit(self.frame)
+        self.lineEditpassword.setGeometry(QtCore.QRect(45, 160, 211, 41))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(10)
+        self.lineEditpassword.setFont(font)
+        self.lineEditpassword.setInputMask("")
+        self.lineEditpassword.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.lineEditpassword.setObjectName("lineEditpassword")
+        self.pushButton = QtWidgets.QPushButton(self.frame)
+        self.pushButton.setGeometry(QtCore.QRect(40, 230, 211, 51))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(10)
+        self.pushButton.setFont(font)
+        self.pushButton.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
+        self.pushButton.setObjectName("pushButton")
+        self.labeltip = QtWidgets.QLabel(self.frame)
+        self.labeltip.setGeometry(QtCore.QRect(30, 300, 221, 61))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(10)
+        self.labeltip.setFont(font)
+        self.labeltip.setStyleSheet("color: rgb(255, 0, 0);")
+        self.labeltip.setText("")
+        self.labeltip.setObjectName("labeltip")
+        self.frame_2 = QtWidgets.QFrame(self.frame)
+        self.frame_2.setGeometry(QtCore.QRect(0, 70, 41, 41))
+        self.frame_2.setStyleSheet("image: url(./config/user.png);")
+        self.frame_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_2.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_2.setObjectName("frame_2")
+        self.frame_3 = QtWidgets.QFrame(self.frame)
+        self.frame_3.setGeometry(QtCore.QRect(0, 160, 41, 41))
+        self.frame_3.setStyleSheet("image: url(./config/password.png);")
+        self.frame_3.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_3.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_3.setObjectName("frame_3")
+        self.listWidget = QtWidgets.QListWidget(loginForm)
+        self.listWidget.setGeometry(QtCore.QRect(410, 80, 201, 401))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(20)
+        self.listWidget.setFont(font)
+        self.listWidget.setStyleSheet("color: rgb(255, 255, 255);")
+        self.listWidget.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.listWidget.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.listWidget.setObjectName("listWidget")
+        self.label_2 = QtWidgets.QLabel(loginForm)
+        self.label_2.setGeometry(QtCore.QRect(410, 20, 201, 51))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(18)
+        self.label_2.setFont(font)
+        self.label_2.setStyleSheet("")
+        self.label_2.setObjectName("label_2")
+        self.commandLinkButton = QtWidgets.QCommandLinkButton(loginForm)
+        self.commandLinkButton.setGeometry(QtCore.QRect(780, 550, 151, 48))
+        font = QtGui.QFont()
+        font.setFamily("Segoe UI")
+        font.setPointSize(10)
+        self.commandLinkButton.setFont(font)
+        self.commandLinkButton.setStyleSheet("color: rgb(255,255,255)")
+        self.commandLinkButton.setObjectName("commandLinkButton")
+        self.commandLinkButton.clicked.connect(self.showui)
+        self.checkBoxrm = QtWidgets.QCheckBox(loginForm)
+        self.checkBoxrm.setGeometry(QtCore.QRect(110, 510, 91, 19))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(10)
+        self.checkBoxrm.setFont(font)
+        self.checkBoxrm.setStyleSheet("color: rgb(255, 255, 255);")
+        self.checkBoxrm.setChecked(True)
+        self.checkBoxrm.setObjectName("checkBoxrm")
+        self.checkBoxkeep = QtWidgets.QCheckBox(loginForm)
+        self.checkBoxkeep.setGeometry(QtCore.QRect(110, 540, 121, 19))
+        font = QtGui.QFont()
+        font.setFamily("汉仪文黑-85W")
+        font.setPointSize(10)
+        self.checkBoxkeep.setFont(font)
+        self.checkBoxkeep.setStyleSheet("color: rgb(255, 255, 255);")
+        self.checkBoxkeep.setObjectName("checkBoxkeep")
+        self.pushButton_2 = QtWidgets.QPushButton(loginForm)
+        self.pushButton_2.setGeometry(QtCore.QRect(0, 0, 50, 50))
+        self.pushButton_2.setStyleSheet("image: url(./config/close.ico);")
+        self.pushButton_2.setText("")
+        self.pushButton_2.setObjectName("pushButton_2")
+
+        self.retranslateUi(loginForm)
+        self.pushButton_2.clicked.connect(self.hideng)
+        self.pushButton.clicked.connect(self.login)
+        self.listWidget.currentRowChanged.connect(self.filling)
+        QtCore.QMetaObject.connectSlotsByName(loginForm)
+        loginForm.setTabOrder(self.pushButton, self.lineEditusername)
+        loginForm.setTabOrder(self.lineEditusername, self.lineEditpassword)
+        loginForm.setTabOrder(self.lineEditpassword, self.listWidget)
+
+    def retranslateUi(self, loginForm):
+        _translate = QtCore.QCoreApplication.translate
+        loginForm.setWindowTitle(_translate("loginForm", "Login"))
+        self.label.setText(_translate("loginForm", "提问加分-登录"))
+        self.loginlabel.setText(_translate("loginForm", "账户登录"))
+        self.lineEditusername.setPlaceholderText(_translate("loginForm", "手机号"))
+        self.lineEditpassword.setPlaceholderText(_translate("loginForm", "密码"))
+        self.pushButton.setText(_translate("loginForm", "登录"))
+        self.label_2.setText(_translate("loginForm", "记住的账号："))
+        self.commandLinkButton.setText(_translate("loginForm", "使用本地配置"))
+        self.checkBoxrm.setText(_translate("loginForm", "记住我"))
+        self.checkBoxkeep.setText(_translate("loginForm", "保存到本地"))
+
+    def filling(self):
+        user = self.listWidget.currentItem().toolTip()
+        self.lineEditusername.setText(user)
+        # self.listWidget.setCurrentRow(-1)
+
+    def showui(self):
+        self.hide()
+        ui.show()
+
+    def login(self):
+        try:
+            global dic, classesList
+            user = self.lineEditusername.text()
+            pawd = self.lineEditpassword.text()
+            data = {"username": user, "password": hashlib.md5(pawd.encode(encoding='UTF-8')).hexdigest(),
+                    "system": "care", "clientType": "pc", "isReMe": 1, "secure": False, "withticket": "", "isIframe": 1}
+            self.res = s.post(url="https://id.seewo.com/login", data=data).json()
+            name = self.res['data']['data']['user']['nickname']
+            photoUrl = self.res['data']['data']['user']['photoUrl']
+            x_csrf_token = \
+            re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
+            info = s.get('https://care.seewo.com/app/user/info.json',
+                         params={'token': self.res['data']['data']['token']}).json()
+            headers = {"Content-Type": "application/json; charset=UTF-8", "x-csrf-token": x_csrf_token,
+                       "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53",
+                       "x-requested-with": "XMLHttpRequest"}
+            datastr = json.dumps({"action": "CLASSROOM_FETCH", "params": {"originKey": "easicare-web"}})
+            self.res = s.post(
+                f'https://care.seewo.com/app/apis.json?action=CLASSROOM_FETCH&timestamp={int(time.time() * 1000 // 1)}&isAjax=1',
+                data=datastr, headers=headers).json()
+            classes = self.res['data']["classrooms"]
+            classesList = []
+            for c in classes:
+                qmixmap = QtGui.QPixmap()
+                qmixmap.loadFromData(requests.get(c["classAvatarPath"]).content)
+                item = QtWidgets.QListWidgetItem()
+                item.setIcon(QtGui.QIcon(qmixmap))
+                item.setText(c["classNickName"])
+                classesDic = {"CNN": c["classNickName"], "CI": c["classId"], "CAP": c["classAvatarPath"]}
+                classesList.append(classesDic)
+                uicc.listWidget.addItem(item)
+                uicc.show()
+            if not os.path.exists(file + "/imgtemp/{}".format(self.getPicName(photoUrl))):
+                photo = s.get(photoUrl).content
+                with open(file + "/imgtemp/{}".format(self.getPicName(photoUrl)), "wb") as f: f.write(photo)
+            if self.checkBoxrm.isChecked():
+                for i in dic["remember"]:
+                    if i["USER"] == user:
+                        break
+                else:
+                    rememberdic = {"USER": user, "NAME": name, 'photoUrl': photoUrl}
+                    dic["remember"].append(rememberdic)
+
+            # print("Success")
+
+        except BaseException as error:
+            traceback.print_exc(file=open(file + f"/errorlogs/{int(time.time() // 1)}.log", 'w'))
+
+    def hideng(self):
+        if self.anim is None:
+            self.anim = QtCore.QPropertyAnimation(self, b"windowOpacity")  # 设置动画对象
+            self.anim.setDuration(150)  # 设置动画时长
+            self.anim.setStartValue(1)  # 设置初始属性，1.0为不透明
+            self.anim.setEndValue(0)  # 设置结束属性，0为完全透明
+            self.anim.finished.connect(self.hide)  # 动画结束时，关闭窗口
+            self.anim.start()  # 开始动画
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.m_flag = True
+            self.m_Position = event.globalPos() - self.pos()  # 获取鼠标相对窗口的位置
+            event.accept()
+            self.setCursor(QtGui.QCursor(QtCore.Qt.OpenHandCursor))  # 更改鼠标图标
+
+    def mouseMoveEvent(self, QMouseEvent):
+        if QtCore.Qt.LeftButton and self.m_flag:
+            self.move(QMouseEvent.globalPos() - self.m_Position)  # 更改窗口位置
+            QMouseEvent.accept()
+
+    def mouseReleaseEvent(self, QMouseEvent):
+        self.m_flag = False
+        self.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
 
 
 class Ui_Form_floatlabel(QtWidgets.QWidget):
@@ -430,6 +812,7 @@ class Ui_Form_floatlabel(QtWidgets.QWidget):
         super(Ui_Form_floatlabel, self).__init__()
         self.color = dic['color']
         self.anim = None
+        self.m_flag = False
         self.setupUi(self)
 
     def setupUi(self, Form):
@@ -474,6 +857,10 @@ class Ui_Form_floatlabel(QtWidgets.QWidget):
             QMouseEvent.accept()
 
     def mouseReleaseEvent(self, QMouseEvent):
+        if self.y() >= int((dk.availableGeometry().height() - self.height() // 1.75)):
+            self.setGeometry(
+                QtCore.QRect(self.x(), int(dk.availableGeometry().height() - self.height() // 1.75), self.width(),
+                             self.height()))
         self.m_flag = False
         self.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
 
@@ -488,15 +875,20 @@ class MESSAGEBOX(QtWidgets.QMessageBox):
         font.setFamily("汉仪文黑-85W")
         font.setPointSize(20)
         self.setFont(font)
-        self.setWindowFlags(Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
-        self.setIcon(QtWidgets.QMessageBox.Information)
-    def TIP(self,txt:str,ti:int):
+        self.setIconPixmap(QtGui.QPixmap('./config/information.png').scaled(50, 50))
+        self.setWindowFlags(Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Drawer)
+        self.sound = QtMultimedia.QSoundEffect()
+        self.sound.setSource(QtCore.QUrl.fromLocalFile('./config/MessageOut.wav'))
+        self.sound.setLoopCount(1)
+        self.sound.setVolume(50)
+
+    def TIP(self, txt: str, ti: int):
         self.setText(txt)
         self.button(QtWidgets.QMessageBox.Ok).animateClick(1000 * ti)
-        self.exec_()
-        # msgBox.
-        # msgBox.setWindowFlags(Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
-        # msgBox.exec_()
+        if self.isHidden():
+            self.sound.play()
+            self.exec_()
+            self.sound.stop()
 
 
 class MyQSTI(QtWidgets.QSystemTrayIcon):
@@ -506,10 +898,10 @@ class MyQSTI(QtWidgets.QSystemTrayIcon):
         icon.addPixmap(QtGui.QPixmap("./config/icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.setIcon(icon)
         self.openAction = QtWidgets.QAction("打开", self)
-        self.loginAction=QtWidgets.QAction('login',self)
-        self.openAction.setIcon(QtGui.QIcon.fromTheme("close",QtGui.QIcon('./config/show.png')))
+        self.loginAction = QtWidgets.QAction('test', self)
+        self.openAction.setIcon(QtGui.QIcon.fromTheme("close", QtGui.QIcon('./config/show.png')))
         self.closeAction = QtWidgets.QAction("退出", self)
-        self.closeAction.setIcon(QtGui.QIcon.fromTheme("show",QtGui.QIcon('./config/close2.png')))
+        self.closeAction.setIcon(QtGui.QIcon.fromTheme("show", QtGui.QIcon('./config/close2.png')))
         self.trayIconMenu = QtWidgets.QMenu()
         self.trayIconMenu.addAction(self.openAction)
         self.trayIconMenu.addAction(self.loginAction)
@@ -517,16 +909,23 @@ class MyQSTI(QtWidgets.QSystemTrayIcon):
         self.setContextMenu(self.trayIconMenu)
         self.closeAction.triggered.connect(self.shutdown)
         self.openAction.triggered.connect(self.showui)
-        self.loginAction.triggered.connect(self.login)
+        self.loginAction.triggered.connect(self.test)
         self.show()
-    def login(self):
-        bro.page().runJavaScript('login("{}","{}");'.format(username,password))
+
     def showui(self):
         ui.show()
         flForm.hide()
         fForm.hide()
-    def showmsg(self,title:str,msg:str):
-        self.showMessage(title,msg,10)
+
+    def showmsg(self, title: str, msg: str):
+        self.showMessage(title, msg, 10)
+
+    def test(self):
+        msgbox.TIP("HELLOWORLD!", 10)
+        # print(f"app:{sys.getsizeof(app)};localserver:{sys.getsizeof(localServer)};loginui:{sys.getsizeof(loginui)};ui:{sys.getsizeof(ui)};qtsi:{sys.getsizeof(qsti)}")
+        # ui.outTimeList.addItem('hello')
+        # print(ui.s_listWidget.currentRow())
+
     def shutdown(self):
         try:
             thread_2.exit()
@@ -552,7 +951,7 @@ class Ui_Form_float(QtWidgets.QWidget):
         Form.resize(150, 150)
         Form.setMinimumSize(QtCore.QSize(150, 150))
         Form.setMaximumSize(QtCore.QSize(150, 150))
-        Form.setGeometry(1700, 850, 150, 150)
+        Form.setGeometry(1700, dk.availableGeometry().height() - 170, 150, 150)
         Form.setWindowOpacity(0.7)
         Form.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
         Form.setAttribute(QtCore.Qt.WA_TranslucentBackground)
@@ -597,6 +996,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self._endPos = None
         self._tracking = False
         self.anim = None
+        self.m_flag = False
         self.color = dic['color']
         self.setupUi(self)
 
@@ -645,21 +1045,26 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
             "QPushButton{border-radius: 20px;}QPushButton:pressed {background-color: rgb(64, 230, 255);}QPushButton:disabled {background-color:rgb(189, 189, 189);}")
         self.outputButton.setObjectName("outputButton")
         self.hitokoto_label = QtWidgets.QLabel(self.centralwidget)
-        self.hitokoto_label.setGeometry(QtCore.QRect(400, 50, 1091, 50))
+        self.hitokoto_label.setGeometry(QtCore.QRect(0, 50, 1600, 50))
         font = QtGui.QFont()
         font.setFamily("汉仪文黑-85W")
-        font.setPointSize(20)
-        # font.setBold(False)
-        # font.setUnderline(False)
-        font.setWeight(75)
+        font.setPointSize(26)
+        font.setBold(False)
         self.hitokoto_label.setFont(font)
         self.hitokoto_label.setObjectName("hitokoto_label")
+        self.hitokoto_label.setAlignment(QtCore.Qt.AlignCenter)
         self.hitokoto_label.setStyleSheet('color:' + self.color)
         self.t_message_label = QtWidgets.QLabel(self.centralwidget)
         self.t_message_label.setGeometry(QtCore.QRect(0, 0, 100, 50))
         self.t_message_label.setFont(font20)
         self.t_message_label.setText("")
         self.t_message_label.setObjectName("t_message_label")
+        self.outTimeList = QtWidgets.QListWidget(self.centralwidget)
+        self.outTimeList.setGeometry(QtCore.QRect(1000, 590, 280, 100))
+        self.outTimeList.setFont(font20)
+        self.outTimeList.setObjectName("outTimeList")
+        # QtWidgets.QScroller.grabGesture(self.outTimeList,QtWidgets.QScroller.LeftMouseButtonGesture)
+        # QtWidgets.QScroller.grabGesture(self.outTimeList, QtWidgets.QScroller.TouchGesture)
         self.ingList = QtWidgets.QListWidget(self.centralwidget)
         self.ingList.setGeometry(QtCore.QRect(1000, 350, 280, 100))
         self.ingList.setFont(font20)
@@ -676,6 +1081,10 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.stu_label_3.setGeometry(QtCore.QRect(860, 480, 120, 50))
         self.stu_label_3.setFont(font20)
         self.stu_label_3.setObjectName("stu_label_3")
+        self.stu_label_4 = QtWidgets.QLabel(self.centralwidget)
+        self.stu_label_4.setGeometry(QtCore.QRect(860, 610, 120, 50))
+        self.stu_label_4.setFont(font20)
+        self.stu_label_4.setObjectName("stu_label_4")
         self.saveButton_2 = QtWidgets.QPushButton(self.centralwidget)
         self.saveButton_2.setEnabled(True)
         self.saveButton_2.setGeometry(QtCore.QRect(1350, 370, 160, 71))
@@ -695,6 +1104,12 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.t_listWidget.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.ingList.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.waitList.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.outTimeList.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
+        QtWidgets.QScroller.grabGesture(self.s_listWidget, QtWidgets.QScroller.TouchGesture)
+        QtWidgets.QScroller.grabGesture(self.t_listWidget, QtWidgets.QScroller.TouchGesture)
+        QtWidgets.QScroller.grabGesture(self.ingList, QtWidgets.QScroller.TouchGesture)
+        QtWidgets.QScroller.grabGesture(self.waitList, QtWidgets.QScroller.TouchGesture)
+        QtWidgets.QScroller.grabGesture(self.outTimeList, QtWidgets.QScroller.TouchGesture)
         self.label2 = QtWidgets.QLabel(self.centralwidget)
         self.label2.setGeometry(QtCore.QRect(30, 820, 72, 15))
         self.label2.setObjectName("label")
@@ -705,6 +1120,13 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.saveButton_3.setStyleSheet(
             "QPushButton{border-radius: 20px;}QPushButton:pressed {background-color: rgb(64, 230, 255);}QPushButton:disabled {background-color:rgb(189, 189, 189);}")
         self.saveButton_3.setObjectName("saveButton_3")
+        self.saveButton_4 = QtWidgets.QPushButton(self.centralwidget)
+        self.saveButton_4.setEnabled(True)
+        self.saveButton_4.setGeometry(QtCore.QRect(1350, 610, 160, 71))
+        self.saveButton_4.setFont(font20)
+        self.saveButton_4.setStyleSheet(
+            "QPushButton{border-radius: 20px;}QPushButton:pressed {background-color: rgb(64, 230, 255);}QPushButton:disabled {background-color:rgb(189, 189, 189);}")
+        self.saveButton_4.setObjectName("saveButton_4")
         MainWindow.setCentralWidget(self.centralwidget)
         self.saveButton.clicked.connect(addtowaitlist)
         self.outputButton.clicked.connect(output)
@@ -755,6 +1177,10 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.closeButton.clicked.connect(self.close)
         self.minButton.clicked.connect(minwindow)
         self.stopcheckbox.stateChanged.connect(wait)
+        self.saveButton_4.clicked.connect(delTiOut)
+        self.saveButton_4.hide()
+        self.outTimeList.hide()
+        self.stu_label_4.hide()
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -769,11 +1195,13 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.hitokoto_label.setText(_translate("MainWindow", "                           “一言”正在获取中······"))
         self.stu_label_2.setText(_translate("MainWindow", "讲题中："))
         self.stu_label_3.setText(_translate("MainWindow", "排队中："))
+        self.stu_label_4.setText(_translate("MainWindow", "超时："))
         self.saveButton_2.setText(_translate("MainWindow", "讲完了"))
         self.label2.setText(_translate("MainWindow", "By link"))
         self.label.setText(_translate("MainWindow", "提问加分-v0.9.5内部测试版"))
         self.saveButton_3.setText(_translate("MainWindow", "点错了"))
         self.stopcheckbox.setText(_translate("MainWindow", "暂停"))
+        self.saveButton_4.setText(_translate("MainWindow", "已回"))
 
     def closeEvent(self, event):
         if self.anim is None:
@@ -781,7 +1209,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
             self.anim.setDuration(150)  # 设置动画时长
             self.anim.setStartValue(1)  # 设置初始属性，1.0为不透明
             self.anim.setEndValue(0)  # 设置结束属性，0为完全透明
-            self.anim.finished.connect(self.hide)  # 动画结束时，关闭窗口
+            self.anim.finished.connect(self.deleteLater)  # 动画结束时，关闭窗口
             self.anim.start()  # 开始动画
             event.ignore()  # 忽略事件
 
@@ -804,7 +1232,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
 
 
-class Ui_Form(object):
+class Ui_Form:
     def setupUi(self, Form):
         Form.setObjectName("Form")
         Form.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -824,6 +1252,7 @@ class Ui_Form(object):
         # self.textBrowser.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         # self.textBrowser.setVerticalScrollBarPolicy(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.textBrowser.setObjectName("textBrowser")
+        QtWidgets.QScroller.grabGesture(self.textBrowser, QtWidgets.QScroller.TouchGesture)
         self.pushButton = QtWidgets.QPushButton(Form)
         self.pushButton.setGeometry(QtCore.QRect(300, 480, 200, 80))
         self.pushButton_2 = QtWidgets.QPushButton(Form)
@@ -849,33 +1278,6 @@ class Ui_Form(object):
         self.pushButton.setText(_translate("Form", "导出为文件"))
 
 
-class Ui_updateForm(object):
-    def setupUi(self, updateForm):
-        updateForm.setObjectName("updateForm")
-        updateForm.resize(300, 100)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(updateForm.sizePolicy().hasHeightForWidth())
-        updateForm.setSizePolicy(sizePolicy)
-        updateForm.setMinimumSize(QtCore.QSize(300, 100))
-        updateForm.setMaximumSize(QtCore.QSize(300, 100))
-        self.label = QtWidgets.QLabel(updateForm)
-        self.label.setGeometry(QtCore.QRect(20, 20, 221, 18))
-        self.label.setObjectName("label")
-        self.progressBar = QtWidgets.QProgressBar(updateForm)
-        self.progressBar.setGeometry(QtCore.QRect(20, 50, 271, 23))
-        self.progressBar.setProperty("value", 0)
-        self.progressBar.setObjectName("progressBar")
-        self.retranslateUi(updateForm)
-        QtCore.QMetaObject.connectSlotsByName(updateForm)
-
-    def retranslateUi(self, updateForm):
-        _translate = QtCore.QCoreApplication.translate
-        updateForm.setWindowTitle(_translate("updateForm", "更新"))
-        self.label.setText(_translate("updateForm", "更新ing ..........."))
-
-
 waitcode, waittime = False, 0.0
 
 
@@ -898,11 +1300,19 @@ def wait():
         temptime = time.perf_counter() - waittime
 
 
-def output():
-    global out
-    dic_t, dic_s, gong, nameg, alland, out = {}, {}, [], [], [], ''
+def delTiOut():
+    x = ui.outTimeList.currentRow()
+    if x > -1:
+        ui.outTimeList.takeItem(x)
+        ui.outTimeList.setCurrentRow(-1)
+        msgbox.TIP('成功！', 5)
+
+
+def outputm(dic):
+    dic_t, dic_s, gong, nameg, alland, out, outdic = {}, {}, [], [], [], '', {}
     if countmode == "0":
-        for d in dic[todaytime]:
+        todaydic = dic[todaytime]
+        for d in todaydic:
             if d['tea'] == '老师':
                 pass
             elif d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
@@ -944,79 +1354,74 @@ def output():
                 point = allpoint
             else:
                 point = tea_count + stu_count
-            out = out + n + '+' + str(point) + '分\n'
-        if countmode == '1':
-            for d in dic[todaytime]:
-                if d['tea'] == '老师':
-                    pass
-                elif d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
-                    continue
-                gong.append(d['tea'] + d['stu'])
-                if d['tea'] not in nameg:
-                    nameg.append(d['tea'])
-                if d['stu'] not in nameg:
-                    nameg.append(d['stu'])
-                try:
-                    dic_t[d['tea']]
-                    dic_t[d['tea']] = dic_t[d['tea']] + onceadd
-                    if dic_t[d['tea']] > onepoint:
-                        dic_t[d['tea']] = onepoint
-                except KeyError:
-                    dic_t[d['tea']] = onceadd
-                try:
-                    dic_s[d['stu']]
-                    dic_s[d['stu']] = dic_s[d['stu']] + onceadd
-                    if dic_s[d['stu']] > onepoint:
-                        dic_s[d['stu']] = onepoint
-                except KeyError:
-                    dic_s[d['stu']] = onceadd
-            out = todaytime + '\n\n'
-            for n in namelist:
-                if n == '老师':
-                    continue
-                if n not in nameg:
-                    continue
-                if dic_t.get(n) == None:
-                    tea_count = 0
-                else:
-                    tea_count = dic_t.get(n)
-                if dic_s.get(n) == None:
-                    stu_count = 0
-                else:
-                    stu_count = dic_s.get(n)
-                if tea_count + stu_count > allpoint:
-                    point = allpoint
-                else:
-                    point = tea_count + stu_count
-                out = out + n + '+' + str(point) + '分\n'
+            outdic[n] = point
+    elif countmode == '1':
+        todaydic = dic[todaytime]
+        for d in todaydic:
+            if d['tea'] == '老师':
+                pass
+            elif d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
+                continue
+            gong.append(d['tea'] + d['stu'])
+            if d['tea'] not in nameg:
+                nameg.append(d['tea'])
+            if d['stu'] not in nameg:
+                nameg.append(d['stu'])
+            try:
+                dic_t[d['tea']]
+                dic_t[d['tea']] = dic_t[d['tea']] + onceadd
+                if dic_t[d['tea']] > onepoint:
+                    dic_t[d['tea']] = onepoint
+            except KeyError:
+                dic_t[d['tea']] = onceadd
+            try:
+                dic_s[d['stu']]
+                dic_s[d['stu']] = dic_s[d['stu']] + onceadd
+                if dic_s[d['stu']] > onepoint:
+                    dic_s[d['stu']] = onepoint
+            except KeyError:
+                dic_s[d['stu']] = onceadd
+        out = todaytime + '\n\n'
+        for n in namelist:
+            if n == '老师':
+                continue
+            if n not in nameg:
+                continue
+            if dic_t.get(n) == None:
+                tea_count = 0
+            else:
+                tea_count = dic_t.get(n)
+            if dic_s.get(n) == None:
+                stu_count = 0
+            else:
+                stu_count = dic_s.get(n)
+            if tea_count + stu_count > allpoint:
+                point = allpoint
+            else:
+                point = tea_count + stu_count
+            outdic[n] = point
+    return outdic
 
+
+def output():
+    global out
+    out = todaytime + '\n\n'
+    d = outputm(dic=dic)
+    for i in d:
+        out = out + i + '+' + str(d[i]) + '分\n'
     FormWindow.show()
     FormUi.textBrowser.setText(out)
 
 
 def juststop():
-    xuan = ui.waitList.currentIndex().row()
+    xuan = ui.waitList.currentRow()
     if xuan >= 0:
         qmut_1.lock()
         dic = waitlist[xuan]
         del waitlist[xuan]
         ui.waitList.takeItem(xuan)
         qmut_1.unlock()
-
-# def login(username,password):
-#     data={"username": username,"password": password,"system": "care","clientType": "pc","isReMe": 1,"secure": False,"withticket":"","isIframe": 1}
-#     s=requests.Session()
-#     res=s.post(url="https://id.seewo.com/login",data=data).json()
-#     try:
-#         user=res['data']['data']['user']
-#         token=res['data']['data']['token']
-#         data=res['data']
-#         res=s.post("https://id.seewo.com/common/setToken",data={"tk":token}).json()
-#         info=s.get('https://care.seewo.com/app/user/info.json',params={'token':token}).json()
-#         dic={'user':user,'token':token,"info":info,'session':s,'data':data}
-#     except KeyError:
-#         dic=res
-#     return dic
+        ui.waitList.setCurrentRow(-1)
 
 
 def minwindow():
@@ -1032,15 +1437,17 @@ def showui():
 
 
 def stopandsave():
-    xuan = ui.ingList.currentIndex().row()
+    xuan = ui.ingList.currentRow()
     if xuan >= 0:
         qmut_1.lock()
         dic = inglist[xuan]
         del inglist[xuan]
         ui.ingList.takeItem(xuan)
         save(dic)
-        msgbox.TIP('保存成功！',5)
+        msgbox.TIP('保存成功！', 5)
         qmut_1.unlock()
+        ui.ingList.setCurrentRow(-1)
+        ui.waitList.setCurrentRow(-1)
 
 
 def update():
@@ -1071,22 +1478,31 @@ def update():
 
 def addtowaitlist():
     global waitlist, inglist
-    t = int(time.time() // 1)
-    stu = namelist[ui.s_listWidget.currentIndex().row()]
-    if ui.t_listWidget.currentIndex().row() >= len(namelist):
-        tea = '老师'
-        qmut_1.lock()
-        dic_wait = ({'time': t, 'stu': stu, 'tea': tea})
-        save(dic_wait)
-        msgbox.TIP('保存成功！',5)
-        qmut_1.unlock()
-    else:
-        tea = namelist[ui.t_listWidget.currentIndex().row()]
-        qmut_1.lock()
-        dic_wait = ({'time': t, 'stu': stu, 'tea': tea})
-        waitlist.append(dic_wait)
-        ui.waitList.addItem(tea + stu)
-        qmut_1.unlock()
+    try:
+        t = int(time.time() // 1)
+        stu = namelist[ui.s_listWidget.currentRow()]
+        if ui.t_listWidget.currentRow() >= len(namelist):
+            tea = '老师'
+            qmut_1.lock()
+            dic_wait = ({'time': t, 'stu': stu, 'tea': tea})
+            save(dic_wait)
+            msgbox.TIP('保存成功！', 5)
+            qmut_1.unlock()
+        else:
+            tea = namelist[ui.t_listWidget.currentRow()]
+            qmut_1.lock()
+            dic_wait = ({'time': t, 'stu': stu, 'tea': tea})
+            waitlist.append(dic_wait)
+            ui.waitList.addItem(tea + stu)
+            qmut_1.unlock()
+        ui.s_listWidget.setCurrentRow(-1)
+        ui.t_listWidget.setCurrentRow(-1)
+    except IndexError:
+        pass
+
+
+def qinli():
+    print(gc.collect(),"\nyes!")
 
 
 class MyObject(QtCore.QObject):
@@ -1098,13 +1514,16 @@ class MyObject(QtCore.QObject):
         thread_1 = Thread_1()
         thread_1.start()
         thread_1._Signal.connect(self.sendmsg)
+        thread_1.signal.connect(qinli)
 
     def sendmsg(self):
-            msgbox.TIP(tex,15)
+        msgbox.TIP(tex, 15)
+
 
 class Thread_1(QtCore.QThread):
     global tex, waitlist, inglist
     _Signal = QtCore.pyqtSignal()
+    signal = QtCore.pyqtSignal()
 
     def __init__(self):
         global tex
@@ -1112,13 +1531,17 @@ class Thread_1(QtCore.QThread):
 
     def run(self):
         global tex, waitlist, inglist
+        ci = 0
+        self.dic_old = copy.deepcopy(dic)
         while True:
-            if ui.isHidden() and fForm.isHidden():
-                    thread_2.exit()
-                    update()
-                    sys.exit(0)
+            try:
+                if time.perf_counter() > 3:
+                    if ui.isHidden() and fForm.isHidden() and loginui.isHidden():
+                        app.exit(0)
+            except RuntimeError:
+                app.exit(0)
             if len(inglist) < maxtell and len(waitlist) > 0:
-                qmut_1.lock()
+                qmut_2.lock()
                 dic1 = waitlist[0]
                 inglist.append(dic1)
                 del waitlist[0]
@@ -1127,18 +1550,53 @@ class Thread_1(QtCore.QThread):
                 tex = '请{}组开始讲题！'.format(dic1['tea'] + dic1['stu'])
                 self._Signal.emit()
                 inglist[-1]['start'] = time.perf_counter()
-                qmut_1.unlock()
+                qmut_2.unlock()
             for d in inglist:
                 if (time.perf_counter() - d['start'] - waittime >= maxtime) and (not waitcode):
-                    qmut_1.lock()
+                    qmut_2.lock()
                     tex = '请{}组回到教室！'.format(d['tea'] + d['stu'])
                     xuan = inglist.index(d)
                     inglist.remove(d)
                     ui.ingList.takeItem(xuan)
-                    MyQSTI.showmsg('提醒',tex)
+                    qsti.showmsg('提醒', tex)
                     save(d)
-                    qmut_1.unlock()
+                    qmut_2.unlock()
+            if int(time.perf_counter()) % 2 < 1:
+                print(random.randint(100, 999))
+                if not stuDatas is None:
+                    try:
+                        addpointlist = []
+                        if dic != self.dic_old:
+                            d = outputm(dic)
+                            do = outputm(self.dic_old)
+                            for n in d:
+                                if n == '老师':
+                                    continue
+                                if d.get(n) != do.get(n):
+                                    if do.get(n) is None:
+                                        do[n] = 0
+                                    c = d[n] - do[n]
+                                    for i in range(c):
+                                        addpointlist.append(n)
+                            self.dic_old = copy.deepcopy(dic)
+                        print(addpointlist)
+                        if len(addpointlist) > 0:
+                            print('adding')
+                            for name in addpointlist:
+                                self.res = s.post(
+                                    url=f"https://care.seewo.com/app/apis.json?action=STUDENT_SET_MEDAL_SINGLE&timestamp={int(time.time() * 1000 // 1)}&isAjax=1",
+                                    data=json.dumps({"action": "STUDENT_SET_MEDAL_SINGLE",
+                                                     "params": {"performanceId": uicc.dianpinId,
+                                                                "studentId": stuDatas[name]["UID"],
+                                                                "originKey": "easicare-web"}}), headers=headers).json()
+                    except BaseException as e:
+                        traceback.print_exc(file=open(file + f"/errorlogs/{int(time.time() // 1)}.log", 'w'))
+            if ci > 100:
+                self.signal.emit()
+                print("clear!")
+                ci=0
             time.sleep(0.8)
+            ci = ci + 1
 
 
 def waitforsave():
@@ -1147,15 +1605,7 @@ def waitforsave():
 
 def save(d):
     global dic
-    # t=int(time.time()//1)
-    # stu=namelist[ui.s_listWidget.currentIndex().row()]
-    # if ui.t_listWidget.currentIndex().row()>=len(namelist):
-    #     tea='老师'
-    # else:
-    #     tea=namelist[ui.t_listWidget.currentIndex().row()]
     dic[todaytime].append(d)
-    with open(file + '/config/config.json', 'w') as f:
-        json.dump(dic, f, indent=4)
 
 
 class Thread_2(QtCore.QThread):
@@ -1189,253 +1639,6 @@ class Thread_2(QtCore.QThread):
                     pass
             time.sleep(150)
 
-class BRO(QtWebEngineWidgets.QWebEngineView):
-    def __init__(self):
-        super(BRO, self).__init__()
-        self.setWindowTitle('登录')
-        self.setGeometry(QtCore.QRect(0, 0, 340, 415))
-        self.setWindowFlags(Qt.Qt.Tool)
-        # #加载外部的web界面
-        # url=r'index.html'
-        self.load(QtCore.QUrl('https://id.seewo.com/login-iframe'))
-        # self.setGeometry(QtCore.QRect(0,0,400,500))
-        file = QtCore.QFile("main.js")
-        script = QtWebEngineWidgets.QWebEngineScript()
-        if file.open(QtCore.QIODevice.ReadOnly):
-            content = file.readAll()
-            file.close()
-            script.setSourceCode(content.data().decode())
-            script.setName("main.js")
-            script.setWorldId(QtWebEngineWidgets.QWebEngineScript.MainWorld)
-            script.setInjectionPoint(QtWebEngineWidgets.QWebEngineScript.DocumentReady)
-            #在DOM READY的时候注入。也可以在开始的时候注入。
-            self.page().profile().scripts().insert(script)
-
-class Thread_3(QtCore.QThread):
-    global namelist,dic_old,dic
-    def __init__(self):
-        super(Thread_3, self).__init__()
-    def run(self):
-        global dic_old
-
-        while True:
-            try:
-                with open(file + '/config/config.json', 'r', encoding='utf-8') as f:
-                    dic = json.load(f)
-                addpointlist,outdic,outdic_o=[],{},{}
-                if dic!=dic_old:
-                    outdic,outdic_o={},{}
-                    dic_t, dic_s, gong, nameg= {}, {}, [], []
-                    if countmode == "0":
-                        for d in dic[todaytime]:
-                            if d['tea'] == '老师':
-                                pass
-                            elif d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
-                                continue
-                            gong.append(d['tea'] + d['stu'])
-                            if d['tea'] not in nameg:
-                                nameg.append(d['tea'])
-                            if d['stu'] not in nameg:
-                                nameg.append(d['stu'])
-                            try:
-                                dic_t[d['tea']]
-                                dic_t[d['tea']] = dic_t[d['tea']] + onceadd
-                                if dic_t[d['tea']] > onepoint:
-                                    dic_t[d['tea']] = onepoint
-                            except KeyError:
-                                dic_t[d['tea']] = 2 * onceadd
-                            try:
-                                dic_s[d['stu']]
-                                dic_s[d['stu']] = dic_s[d['stu']] + onceadd
-                                if dic_s[d['stu']] > onepoint:
-                                    dic_s[d['stu']] = onepoint
-                            except KeyError:
-                                dic_s[d['stu']] = 2 * onceadd
-                        for n in namelist:
-                            if n == '老师':
-                                continue
-                            if n not in nameg:
-                                continue
-                            if dic_t.get(n) == None:
-                                tea_count = 0
-                            else:
-                                tea_count = dic_t.get(n)
-                            if dic_s.get(n) == None:
-                                stu_count = 0
-                            else:
-                                stu_count = dic_s.get(n)
-                            if tea_count + stu_count > allpoint:
-                                point = allpoint
-                            else:
-                                point = tea_count + stu_count
-                            if outdic.get(n) == None:
-                                outdic[n] = point
-                            else:
-                                outdic[n] = outdic[n] + point
-                    if countmode == '1':
-                        for d in dic[todaytime]:
-                            if d['tea'] == '老师':
-                                pass
-                            elif d['tea'] + d['stu'] in gong or d['tea'] == d['stu']:
-                                continue
-                            gong.append(d['tea'] + d['stu'])
-                            if d['tea'] not in nameg:
-                                nameg.append(d['tea'])
-                            if d['stu'] not in nameg:
-                                nameg.append(d['stu'])
-                            try:
-                                dic_t[d['tea']]
-                                dic_t[d['tea']] = dic_t[d['tea']] + onceadd
-                                if dic_t[d['tea']] > onepoint:
-                                    dic_t[d['tea']] = onepoint
-                            except KeyError:
-                                dic_t[d['tea']] = onceadd
-                            try:
-                                dic_s[d['stu']]
-                                dic_s[d['stu']] = dic_s[d['stu']] + onceadd
-                                if dic_s[d['stu']] > onepoint:
-                                    dic_s[d['stu']] = onepoint
-                            except KeyError:
-                                dic_s[d['stu']] = onceadd
-                        for n in namelist:
-                            if n == '老师':
-                                continue
-                            if n not in nameg:
-                                continue
-                            if dic_t.get(n) == None:
-                                tea_count = 0
-                            else:
-                                tea_count = dic_t.get(n)
-                            if dic_s.get(n) == None:
-                                stu_count = 0
-                            else:
-                                stu_count = dic_s.get(n)
-                            if tea_count + stu_count > allpoint:
-                                point = allpoint
-                            else:
-                                point = tea_count + stu_count
-                            if outdic.get(n) == None:
-                                outdic[n] = point
-                            else:
-                                outdic[n] = outdic[n] + point
-
-
-                    dic_t_o, dic_s_o, gong_o, nameg_o={}, {}, [], []
-                    if countmode == "0":
-                        for d in dic_old[todaytime]:
-                            if d['tea'] == '老师':
-                                pass
-                            elif d['tea'] + d['stu'] in gong_o or d['tea'] == d['stu']:
-                                continue
-                            gong_o.append(d['tea'] + d['stu'])
-                            if d['tea'] not in nameg_o:
-                                nameg_o.append(d['tea'])
-                            if d['stu'] not in nameg_o:
-                                nameg_o.append(d['stu'])
-                            try:
-                                dic_t_o[d['tea']]
-                                dic_t_o[d['tea']] = dic_t_o[d['tea']] + onceadd
-                                if dic_t_o[d['tea']] > onepoint:
-                                    dic_t_o[d['tea']] = onepoint
-                            except KeyError:
-                                dic_t_o[d['tea']] = 2 * onceadd
-                            try:
-                                dic_s_o[d['stu']]
-                                dic_s_o[d['stu']] = dic_s_o[d['stu']] + onceadd
-                                if dic_s_o[d['stu']] > onepoint:
-                                    dic_s_o[d['stu']] = onepoint
-                            except KeyError:
-                                dic_s_o[d['stu']] = 2 * onceadd
-                        for n in namelist:
-                            if n == '老师':
-                                continue
-                            if n not in nameg_o:
-                                continue
-                            if dic_t_o.get(n) == None:
-                                tea_count = 0
-                            else:
-                                tea_count = dic_t_o.get(n)
-                            if dic_s_o.get(n) == None:
-                                stu_count = 0
-                            else:
-                                stu_count = dic_s_o.get(n)
-                            if tea_count + stu_count > allpoint:
-                                point = allpoint
-                            else:
-                                point = tea_count + stu_count
-                            if outdic_o.get(n) == None:
-                                outdic_o[n] = point
-                            else:
-                                outdic_o[n] = outdic_o[n] + point
-                    if countmode == '1':
-                        for d in dic[todaytime]:
-                            if d['tea'] == '老师':
-                                pass
-                            elif d['tea'] + d['stu'] in gong_o or d['tea'] == d['stu']:
-                                continue
-                            gong_o.append(d['tea'] + d['stu'])
-                            if d['tea'] not in nameg_o:
-                                nameg_o.append(d['tea'])
-                            if d['stu'] not in nameg_o:
-                                nameg_o.append(d['stu'])
-                            try:
-                                dic_t_o[d['tea']]
-                                dic_t_o[d['tea']] = dic_t_o[d['tea']] + onceadd
-                                if dic_t_o[d['tea']] > onepoint:
-                                    dic_t_o[d['tea']] = onepoint
-                            except KeyError:
-                                dic_t_o[d['tea']] = onceadd
-                            try:
-                                dic_s_o[d['stu']]
-                                dic_s_o[d['stu']] = dic_s_o[d['stu']] + onceadd
-                                if dic_s_o[d['stu']] > onepoint:
-                                    dic_s_o[d['stu']] = onepoint
-                            except KeyError:
-                                dic_s_o[d['stu']] = onceadd
-                        for n in namelist:
-                            if n == '老师':
-                                continue
-                            if n not in nameg_o:
-                                continue
-                            if dic_t_o.get(n) == None:
-                                tea_count = 0
-                            else:
-                                tea_count = dic_t_o.get(n)
-                            if dic_s_o.get(n) == None:
-                                stu_count = 0
-                            else:
-                                stu_count = dic_s_o.get(n)
-                            if tea_count + stu_count > allpoint:
-                                point = allpoint
-                            else:
-                                point = tea_count + stu_count
-                            if outdic.get(n) == None:
-                                outdic_o[n] = point
-                            else:
-                                outdic_o[n] = outdic_o[n] + point
-
-                    for n in namelist:
-                        if n == '老师':
-                            continue
-                        if n not in nameg:
-                            continue
-                        if outdic.get(n) != outdic_o.get(n):
-                            if outdic_o.get(n)is None:
-                                outdic_o[n]=0
-                            c=outdic[n]-outdic_o[n]
-                            for i in range(c):
-                                addpointlist.append(n)
-                    dic_old=dic
-                print(addpointlist)
-                if len(addpointlist)>0:
-                    print('adding')
-                    for name in addpointlist:
-                        bro.page().runJavaScript(f"addpoint('{name}');")
-                        self.sleep(1)
-            except Exception as e:
-                print(e,e.args)
-            self.sleep(3)
-
 
 def savefile():
     try:
@@ -1446,9 +1649,9 @@ def savefile():
             outfile = outfile + f"""{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(d['time']))} {d['tea']} 教 {d['stu']}\n"""
         with open(filePath, 'w') as f:
             f.write(outfile)
-        msgbox.TIP('Successful',10)
+        msgbox.TIP('Successful', 10)
     except:
-        msgbox.TIP('失败！',10)
+        msgbox.TIP('失败！', 10)
 
 
 def getmainpalette():
@@ -1600,42 +1803,35 @@ def getmainpalette():
     return palette
 
 
-QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-app = QtWidgets.QApplication([])
-with open(file + '/config/config.json', 'r', encoding='utf-8') as f:
-    dic = json.load(f)
-if dic['names'] == '老师':
-    del dic['names'][-1]
-    with open(file + '/config/config.json', 'w', encoding='utf-8') as f:
-        json.dump(dic, f, indent=4)
-with open(file + '/config/config.json', 'r', encoding='utf-8') as f:
-    dic = json.load(f)
+qsti = MyQSTI()
+dk = app.desktop()
+if dk.screenGeometry().height() < 900 or dk.screenGeometry().width() < 1600:
+    qsti.showmsg("警告", "您的屏幕分辨率不足以运行此程序，请升高后重试。")
+elif dk.availableGeometry().height() <= 900 or dk.availableGeometry().width() <= 1600:
+    qsti.showmsg("提示", "您的屏幕分辨率有些不足，建议升高后重试。")
 namelist = dic['names']
 todaytime = time.strftime("%Y-%m-%d", time.localtime())
 try:
     dic[todaytime]
 except KeyError:
     dic[todaytime] = []
-    with open(file + '/config/config.json', 'w', encoding='utf-8') as f:
-        json.dump(dic, f, indent=4)
 mainWindow = QtWidgets.QMainWindow()
 ui = Ui_MainWindow()
 ui.s_listWidget.addItems(namelist)
 ui.t_listWidget.addItems(namelist)
 ui.t_listWidget.addItem('老师')
 
-# wf=Ui_waitForm()
-# loginui=Ui_loginForm()
+stuDatas = None
+dianpinId = ''
+loginui = Ui_loginForm()
+uicc = Ui_ChooseClasses()
 FormWindow = QtWidgets.QWidget()
 FormUi = Ui_Form()
 FormUi.setupUi(FormWindow)
 fForm = Ui_Form_float()
 flForm = Ui_Form_floatlabel()
-qsti=MyQSTI()
-bro=BRO()
-thread_3 = Thread_3()
 
-msgbox=MESSAGEBOX()
+msgbox = MESSAGEBOX()
 password = dic['password']
 allpoint = dic['allpoint']
 onepoint = dic['onepoint']
@@ -1656,6 +1852,8 @@ if mainidea == 1:
         "QPushButton{color:white;border-radius: 20px;background-color: black;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
     ui.outputButton.setStyleSheet(
         "QPushButton{color:white;border-radius: 20px;background-color: black;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
+    ui.saveButton_4.setStyleSheet(
+        "QPushButton{color:white;border-radius: 20px;background-color: black;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
 else:
     ui.saveButton.setStyleSheet(
         "QPushButton{color:black;border-radius: 20px;background-color: white;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
@@ -1663,26 +1861,25 @@ else:
         "QPushButton{color:black;border-radius: 20px;background-color: white;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
     ui.saveButton_3.setStyleSheet(
         "QPushButton{color:black;border-radius: 20px;background-color: white;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
+    ui.saveButton_4.setStyleSheet(
+        "QPushButton{color:black;border-radius: 20px;background-color: white;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
     ui.outputButton.setStyleSheet(
         "QPushButton{color:black;border-radius: 20px;background-color: white;border:5px solid yellow;}QPushButton:pressed {background-color: rgb(64, 230, 255);}")
 
 thread_2 = Thread_2()
 thread_2.start()
-thread_3.start()
-# if isAuto:
-#     timer=QtCore.QTimer()
-#     timer.start(5)
-#     timer.timeout.connect(lambda self:bro.page().runJavaScript("""login('{}','{}');""".format(username, password)))
-#     timer.stop()
-# def runjs():
-#
+
 obj = MyObject()
-ui.show()
-bro.show()
+loginui.show()
+
+x_csrf_token = re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
+headers = {"Content-Type": "application/json; charset=UTF-8", "x-csrf-token": x_csrf_token,
+           "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53",
+           "x-requested-with": "XMLHttpRequest"}
 app.exec_()
+with open(file + "/config/config.json", 'w') as f: json.dump(dic, f, indent=4)
 thread_2.exit()
 thread_1.exit()
-
 if os.name == 'nt':  # UPDATE
     res = requests.get('https://link-fgfgui.github.io/question-points/update.json').json()
 

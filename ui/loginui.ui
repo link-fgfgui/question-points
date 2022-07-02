@@ -237,7 +237,7 @@
    <property name="font">
     <font>
      <family>汉仪文黑-85W</family>
-     <pointsize>10</pointsize>
+     <pointsize>24</pointsize>
     </font>
    </property>
    <property name="styleSheet">
@@ -288,7 +288,7 @@
     </font>
    </property>
    <property name="styleSheet">
-    <string notr="true"/>
+    <string notr="true">color: rgb(255,255,255)</string>
    </property>
    <property name="text">
     <string>使用本地配置</string>
