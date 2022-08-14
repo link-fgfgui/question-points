@@ -1,5 +1,15 @@
-from PyQt5 import QtNetwork, QtWidgets, QtCore, QtGui, Qt, QtMultimedia
-import sys, os, traceback, random, json, time, requests, hashlib, copy, re, gc
+import copy
+import gc
+import hashlib
+import json
+import os
+import re
+import sys
+import time
+import traceback
+
+import requests
+from PyQt5 import QtNetwork, QtWidgets, QtCore, QtGui, QtMultimedia
 
 QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
 app = QtWidgets.QApplication(sys.argv)
@@ -46,6 +56,8 @@ if os.path.exists(file + '/config/config.json'):
         dic['onepoint'] = 10
     if dic.get('maxtell') is None:
         dic['maxtell'] = 2
+    if dic.get("maxOutTime") is None:
+        dic["maxOutTime"] = 180
     if dic.get('maxtime') is None:
         dic['maxtime'] = 300
     if dic.get('mainidea') is None:
@@ -71,6 +83,8 @@ else:
             dic['onepoint'] = 10
         if dic.get('maxtell') is None:
             dic['maxtell'] = 2
+        if dic.get("maxOutTime") is None:
+            dic["maxOutTime"] = 180
         if dic.get('maxtime') is None:
             dic['maxtime'] = 300
         if dic.get('mainidea') is None:
@@ -420,7 +434,7 @@ elif canshu[1] == 'setconfig':
     sys.exit()
 qmut_1, qmut_2, qmut_3 = QtCore.QMutex(), QtCore.QMutex(), QtCore.QMutex()
 version = "0.9.5"
-waitlist, inglist = [], []
+waitlist, inglist, outTimeList = [], [], []
 
 
 class Ui_ChooseClasses(QtWidgets.QWidget):
@@ -435,7 +449,7 @@ class Ui_ChooseClasses(QtWidgets.QWidget):
         Form.setObjectName("Form")
         Form.resize(773, 488)
         Form.setStyleSheet("QWidget{background-color: rgb(57, 167, 255);border-radius:5px;}")
-        Form.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        Form.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         Form.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         self.listWidget = QtWidgets.QListWidget(Form)
         self.listWidget.setGeometry(QtCore.QRect(10, 40, 761, 431))
@@ -474,7 +488,7 @@ class Ui_ChooseClasses(QtWidgets.QWidget):
         self.pushButton.setObjectName("pushButton")
 
         self.retranslateUi(Form)
-        self.pushButton.clicked.connect(self.exlse)
+        self.pushButton.clicked.connect(self.exist)
         self.listWidget.itemClicked.connect(self.showmainwindow)
         # self.listWidget.itemClicked.connect()
         QtCore.QMetaObject.connectSlotsByName(Form)
@@ -485,37 +499,45 @@ class Ui_ChooseClasses(QtWidgets.QWidget):
         self.label.setText(_translate("Form", "请选择班级"))
         self.pushButton.setText(_translate("Form", "取消"))
 
-    def exlse(self):
+    def exist(self):
         self.close()
         loginui.hide()
 
     def showmainwindow(self):
-        global dianpinId, namelist, stuDatas
+        global dianpinId, namelist, stuDatas, dic
         x = self.listWidget.currentRow()
         classId = classesList[x]["CI"]
         x_csrf_token = \
-        re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
+            re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
         headers = {"Content-Type": "application/json; charset=UTF-8", "x-csrf-token": x_csrf_token,
                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53",
                    "x-requested-with": "XMLHttpRequest"}
         datastr = json.dumps(
             {"action": "MEDAL_FETCH_BY_CLASSROOM", "params": {"cid": classId, "originKey": "easicare-web"}})
         self.res = s.post(
-            'https://care.seewo.com/app/apis.json?action=MEDAL_FETCH_BY_CLASSROOM&timestamp=1653650015349&isAjax=1',
+            f'https://care.seewo.com/app/apis.json?action=MEDAL_FETCH_BY_CLASSROOM&timestamp={int(time.time() * 1000 // 1)}&isAjax=1',
             data=datastr, headers=headers).json()
         dianpinDataList = self.res['data']
-        self.dianpinId = ""
+        self.dianpinId = ["", ""]
+        code = [False, False]
         for d in dianpinDataList:
             if d["name"] == "提问加分" and d['type'] == 1:
-                self.dianpinId = d["uid"]
-                break
-        else:
+                self.dianpinId[0] = d["uid"]
+                code[0] = True
+            if d["name"] == "未及时回到教室" and d['type'] == -1:
+                self.dianpinId[1] = d["uid"]
+                code[1] = True
+        if not code[0]:
             msgbox.TIP("没有找到‘提问加分’加分项，请添加后重试！", 3)
+        if not code[1]:
+            msgbox.TIP("没有找到‘未及时回到教室’扣分项，请添加后重试！", 3)
+        if not (code[0] and code[1]):
             return
+
         datastr = json.dumps(
             {"action": "STUDENT_FETCH_LIST", "params": {"classroomId": classId, "originKey": "easicare-web"}})
         self.res = s.post(
-            'https://care.seewo.com/app/apis.json?action=STUDENT_FETCH_LIST&timestamp=1653650015349&isAjax=1',
+            f'https://care.seewo.com/app/apis.json?action=STUDENT_FETCH_LIST&timestamp={int(time.time() * 1000 // 1)}&isAjax=1',
             data=datastr, headers=headers).json()
         stuDatas = {}
         stuDataList = self.res['data']["students"]
@@ -544,6 +566,8 @@ class Ui_ChooseClasses(QtWidgets.QWidget):
                 traceback.print_exc(file=open(file + f"/errorlogs/{int(time.time() // 1)}.log", 'w'))
             ui.s_listWidget.addItem(item)
             ui.t_listWidget.addItem(item2)
+        if loginui.checkBoxkeep.isChecked():
+            dic["names"] = namelist
         ui.t_listWidget.addItem("老师")
         ui.show()
         self.close()
@@ -570,7 +594,7 @@ class Ui_loginForm(QtWidgets.QWidget):
     def setupUi(self, loginForm):
         loginForm.setObjectName("loginForm")
         loginForm.resize(934, 604)
-        loginForm.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        loginForm.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         loginForm.setStyleSheet(
             "QWidget{background-color: rgb(57, 167, 255);border-radius:5px;}.QLabel{color: rgb(255, 255, 255);}")
         self.label = QtWidgets.QLabel(loginForm)
@@ -657,7 +681,7 @@ class Ui_loginForm(QtWidgets.QWidget):
         font.setFamily("汉仪文黑-85W")
         font.setPointSize(20)
         self.listWidget.setFont(font)
-        self.listWidget.setStyleSheet("color: rgb(255, 255, 255);")
+        self.listWidget.setStyleSheet("color: rgb(255, 255, 255);border-radius: 10px;")
         self.listWidget.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.listWidget.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.listWidget.setObjectName("listWidget")
@@ -743,7 +767,7 @@ class Ui_loginForm(QtWidgets.QWidget):
             name = self.res['data']['data']['user']['nickname']
             photoUrl = self.res['data']['data']['user']['photoUrl']
             x_csrf_token = \
-            re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
+                re.findall(r'<meta name="csrf-token" content="(.*?)"', s.get('https://care.seewo.com/app/').text)[0]
             info = s.get('https://care.seewo.com/app/user/info.json',
                          params={'token': self.res['data']['data']['token']}).json()
             headers = {"Content-Type": "application/json; charset=UTF-8", "x-csrf-token": x_csrf_token,
@@ -821,7 +845,7 @@ class Ui_Form_floatlabel(QtWidgets.QWidget):
         Form.resize(1313, 261)
         Form.setWindowOpacity(0.7)
         Form.setGeometry(800, 10, 1313, 261)
-        Form.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        Form.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         Form.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.label = QtWidgets.QLabel(Form)
         self.label.setGeometry(QtCore.QRect(0, 0, 1311, 261))
@@ -876,7 +900,7 @@ class MESSAGEBOX(QtWidgets.QMessageBox):
         font.setPointSize(20)
         self.setFont(font)
         self.setIconPixmap(QtGui.QPixmap('./config/information.png').scaled(50, 50))
-        self.setWindowFlags(Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Drawer)
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Drawer)
         self.sound = QtMultimedia.QSoundEffect()
         self.sound.setSource(QtCore.QUrl.fromLocalFile('./config/MessageOut.wav'))
         self.sound.setLoopCount(1)
@@ -917,8 +941,8 @@ class MyQSTI(QtWidgets.QSystemTrayIcon):
         flForm.hide()
         fForm.hide()
 
-    def showmsg(self, title: str, msg: str):
-        self.showMessage(title, msg, 10)
+    def showmsg(self, title: str, msg: str, t=10):
+        self.showMessage(title, msg, t)
 
     def test(self):
         msgbox.TIP("HELLOWORLD!", 10)
@@ -953,7 +977,7 @@ class Ui_Form_float(QtWidgets.QWidget):
         Form.setMaximumSize(QtCore.QSize(150, 150))
         Form.setGeometry(1700, dk.availableGeometry().height() - 170, 150, 150)
         Form.setWindowOpacity(0.7)
-        Form.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        Form.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         Form.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.pushButton = QtWidgets.QPushButton(Form)
         self.pushButton.setGeometry(QtCore.QRect(20, 20, 116, 116))
@@ -1009,7 +1033,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         MainWindow.resize(1600, 900)
         MainWindow.setMinimumSize(QtCore.QSize(1600, 900))
         MainWindow.setMaximumSize(QtCore.QSize(1600, 900))
-        MainWindow.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        MainWindow.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("./config/icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         MainWindow.setWindowIcon(icon)
@@ -1060,7 +1084,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.t_message_label.setText("")
         self.t_message_label.setObjectName("t_message_label")
         self.outTimeList = QtWidgets.QListWidget(self.centralwidget)
-        self.outTimeList.setGeometry(QtCore.QRect(1000, 590, 280, 100))
+        self.outTimeList.setGeometry(QtCore.QRect(1000, 650, 280, 100))
         self.outTimeList.setFont(font20)
         self.outTimeList.setObjectName("outTimeList")
         # QtWidgets.QScroller.grabGesture(self.outTimeList,QtWidgets.QScroller.LeftMouseButtonGesture)
@@ -1070,7 +1094,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.ingList.setFont(font20)
         self.ingList.setObjectName("ingList")
         self.waitList = QtWidgets.QListWidget(self.centralwidget)
-        self.waitList.setGeometry(QtCore.QRect(1000, 470, 280, 300))
+        self.waitList.setGeometry(QtCore.QRect(1000, 470, 280, 160))
         self.waitList.setFont(font20)
         self.waitList.setObjectName("waitList")
         self.stu_label_2 = QtWidgets.QLabel(self.centralwidget)
@@ -1082,7 +1106,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.stu_label_3.setFont(font20)
         self.stu_label_3.setObjectName("stu_label_3")
         self.stu_label_4 = QtWidgets.QLabel(self.centralwidget)
-        self.stu_label_4.setGeometry(QtCore.QRect(860, 610, 120, 50))
+        self.stu_label_4.setGeometry(QtCore.QRect(860, 650, 120, 50))
         self.stu_label_4.setFont(font20)
         self.stu_label_4.setObjectName("stu_label_4")
         self.saveButton_2 = QtWidgets.QPushButton(self.centralwidget)
@@ -1122,7 +1146,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.saveButton_3.setObjectName("saveButton_3")
         self.saveButton_4 = QtWidgets.QPushButton(self.centralwidget)
         self.saveButton_4.setEnabled(True)
-        self.saveButton_4.setGeometry(QtCore.QRect(1350, 610, 160, 71))
+        self.saveButton_4.setGeometry(QtCore.QRect(1350, 650, 160, 71))
         self.saveButton_4.setFont(font20)
         self.saveButton_4.setStyleSheet(
             "QPushButton{border-radius: 20px;}QPushButton:pressed {background-color: rgb(64, 230, 255);}QPushButton:disabled {background-color:rgb(189, 189, 189);}")
@@ -1166,7 +1190,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.stopcheckbox = QtWidgets.QCheckBox(self.centralwidget)
         self.stopcheckbox.setObjectName(u"stopcheckbox")
         self.stopcheckbox.setEnabled(True)
-        self.stopcheckbox.setGeometry(QtCore.QRect(1370, 710, 160, 71))
+        self.stopcheckbox.setGeometry(QtCore.QRect(1370, 750, 160, 71))
         self.stopcheckbox.setFont(font20)
         self.stopcheckbox.setCheckable(True)
         self.stopcheckbox.setAutoRepeat(False)
@@ -1178,16 +1202,16 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.minButton.clicked.connect(minwindow)
         self.stopcheckbox.stateChanged.connect(wait)
         self.saveButton_4.clicked.connect(delTiOut)
-        self.saveButton_4.hide()
-        self.outTimeList.hide()
-        self.stu_label_4.hide()
+        # self.saveButton_4.hide()
+        # self.outTimeList.hide()
+        # self.stu_label_4.hide()
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "提问加分-v0.9.5内部测试版"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "提问加分-v0.9.5"))
         self.teach_label.setText(_translate("MainWindow", "教："))
         self.stu_label.setText(_translate("MainWindow", "学："))
         self.saveButton.setText(_translate("MainWindow", "排队"))
@@ -1198,7 +1222,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.stu_label_4.setText(_translate("MainWindow", "超时："))
         self.saveButton_2.setText(_translate("MainWindow", "讲完了"))
         self.label2.setText(_translate("MainWindow", "By link"))
-        self.label.setText(_translate("MainWindow", "提问加分-v0.9.5内部测试版"))
+        self.label.setText(_translate("MainWindow", "提问加分-v0.9.5"))
         self.saveButton_3.setText(_translate("MainWindow", "点错了"))
         self.stopcheckbox.setText(_translate("MainWindow", "暂停"))
         self.saveButton_4.setText(_translate("MainWindow", "已回"))
@@ -1239,7 +1263,7 @@ class Ui_Form:
         Form.resize(800, 600)
         Form.setMinimumSize(QtCore.QSize(800, 600))
         Form.setMaximumSize(QtCore.QSize(800, 600))
-        Form.setWindowFlags(Qt.Qt.FramelessWindowHint | Qt.Qt.WindowStaysOnTopHint | Qt.Qt.Tool)
+        Form.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("./config/icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         Form.setWindowIcon(icon)
@@ -1304,6 +1328,7 @@ def delTiOut():
     x = ui.outTimeList.currentRow()
     if x > -1:
         ui.outTimeList.takeItem(x)
+        del outTimeList[x]
         ui.outTimeList.setCurrentRow(-1)
         msgbox.TIP('成功！', 5)
 
@@ -1491,7 +1516,7 @@ def addtowaitlist():
         else:
             tea = namelist[ui.t_listWidget.currentRow()]
             qmut_1.lock()
-            dic_wait = ({'time': t, 'stu': stu, 'tea': tea})
+            dic_wait = ({'time': t, 'stu': stu, 'tea': tea, 'out': 0})
             waitlist.append(dic_wait)
             ui.waitList.addItem(tea + stu)
             qmut_1.unlock()
@@ -1502,7 +1527,7 @@ def addtowaitlist():
 
 
 def qinli():
-    print(gc.collect(),"\nyes!")
+    gc.collect()
 
 
 class MyObject(QtCore.QObject):
@@ -1530,7 +1555,7 @@ class Thread_1(QtCore.QThread):
         super().__init__()
 
     def run(self):
-        global tex, waitlist, inglist
+        global tex, waitlist, inglist,outTimeList
         ci = 0
         self.dic_old = copy.deepcopy(dic)
         while True:
@@ -1544,26 +1569,48 @@ class Thread_1(QtCore.QThread):
                 qmut_2.lock()
                 dic1 = waitlist[0]
                 inglist.append(dic1)
-                del waitlist[0]
                 ui.waitList.takeItem(0)
+                del waitlist[0]
                 ui.ingList.addItem(dic1['tea'] + dic1['stu'])
-                tex = '请{}组开始讲题！'.format(dic1['tea'] + dic1['stu'])
+                tex = '请 {}、{} 组开始讲题！'.format(dic1['tea'] , dic1['stu'])
                 self._Signal.emit()
                 inglist[-1]['start'] = time.perf_counter()
                 qmut_2.unlock()
             for d in inglist:
                 if (time.perf_counter() - d['start'] - waittime >= maxtime) and (not waitcode):
+                    print(d)
                     qmut_2.lock()
-                    tex = '请{}组回到教室！'.format(d['tea'] + d['stu'])
+                    tex = '请 {}、{} 组回到教室！'.format(d['tea'] , d['stu'])
+                    xuan = inglist.index(d)
+                    d['out'] = time.perf_counter()
+                    outTimeList.append(d)
+                    inglist.remove(d)
+                    ui.outTimeList.addItem(ui.ingList.takeItem(xuan))
+                    qsti.showmsg('提醒', tex,20)
+                    save(d)
+                    qmut_2.unlock()
+            for d in outTimeList:
+                if (time.perf_counter() - d['out'] - waittime >= maxOutTime) and (not waitcode):
+                    qmut_2.lock()
                     xuan = inglist.index(d)
                     inglist.remove(d)
                     ui.ingList.takeItem(xuan)
-                    qsti.showmsg('提醒', tex)
-                    save(d)
+                    self.res = s.post(
+                        url=f"https://care.seewo.com/app/apis.json?action=STUDENT_SET_MEDAL_SINGLE&timestamp={int(time.time() * 1000 // 1)}&isAjax=1",
+                        data=json.dumps({"action": "STUDENT_SET_MEDAL_SINGLE",
+                                         "params": {"performanceId": uicc.dianpinId[1],
+                                                    "studentId": stuDatas[d['stu']]["UID"],
+                                                    "originKey": "easicare-web"}}), headers=headers).json()
+                    self.res = s.post(
+                        url=f"https://care.seewo.com/app/apis.json?action=STUDENT_SET_MEDAL_SINGLE&timestamp={int(time.time() * 1000 // 1)}&isAjax=1",
+                        data=json.dumps({"action": "STUDENT_SET_MEDAL_SINGLE",
+                                         "params": {"performanceId": uicc.dianpinId[1],
+                                                    "studentId": stuDatas[d['tea']]["UID"],
+                                                    "originKey": "easicare-web"}}), headers=headers).json()
                     qmut_2.unlock()
             if int(time.perf_counter()) % 2 < 1:
-                print(random.randint(100, 999))
-                if not stuDatas is None:
+                # print(random.randint(100, 999))
+                if stuDatas is not None:
                     try:
                         addpointlist = []
                         if dic != self.dic_old:
@@ -1579,24 +1626,24 @@ class Thread_1(QtCore.QThread):
                                     for i in range(c):
                                         addpointlist.append(n)
                             self.dic_old = copy.deepcopy(dic)
-                        print(addpointlist)
+                        # print(addpointlist)
                         if len(addpointlist) > 0:
-                            print('adding')
+                            # print('adding')
                             for name in addpointlist:
                                 self.res = s.post(
                                     url=f"https://care.seewo.com/app/apis.json?action=STUDENT_SET_MEDAL_SINGLE&timestamp={int(time.time() * 1000 // 1)}&isAjax=1",
                                     data=json.dumps({"action": "STUDENT_SET_MEDAL_SINGLE",
-                                                     "params": {"performanceId": uicc.dianpinId,
+                                                     "params": {"performanceId": uicc.dianpinId[0],
                                                                 "studentId": stuDatas[name]["UID"],
                                                                 "originKey": "easicare-web"}}), headers=headers).json()
                     except BaseException as e:
                         traceback.print_exc(file=open(file + f"/errorlogs/{int(time.time() // 1)}.log", 'w'))
             if ci > 100:
                 self.signal.emit()
-                print("clear!")
-                ci=0
+                # print("clear!")
+                ci = 0
             time.sleep(0.8)
-            ci = ci + 1
+            ci += 1
 
 
 def waitforsave():
@@ -1837,6 +1884,7 @@ allpoint = dic['allpoint']
 onepoint = dic['onepoint']
 maxtell = dic['maxtell']
 maxtime = dic['maxtime']
+maxOutTime = dic['maxOutTime']
 mainidea = dic['mainidea']
 countmode = dic['countmode']
 onceadd = dic['onceadd']
