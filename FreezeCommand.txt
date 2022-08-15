@@ -1,0 +1,1 @@
+nuitka --standalone --show-progress --windows-disable-console --show-memory --enable-plugin=pyqt5 --windows-icon-from-ico=icon.ico --windows-product-name=提问加分0.9.5 --windows-file-description=提问加分 --windows-product-version=0.9.5 --windows-company=link-fgfgui main.py
