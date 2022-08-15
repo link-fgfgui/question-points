@@ -40,13 +40,17 @@ ___
 
 ## 说明
 ### 参数
-程序有且仅有两个参数：`old`与`debug`,其中`old`已废，但我也不知道问题在哪。。。<br/>`debug`可以打开调试窗口（类似与”设置“），会持续有效
+程序有两个参数(不可同时传)：`setconfig`与`debug`<br/>`debug`可以打开调试窗口（类似与”设置“），会持续有效
 ___
 ### 配置文件
-配置文件（./config/config.json）保持了所有数据，请妥善保存<br/>格式如下<br/>
+配置文件（%AppData%/question-points/config/config.json(Windows)）保持了所有数据，请妥善保存<br/>格式如下<br/>
 ```json
 {
-  "names": [],
+  "names": [
+    "张三",
+    "李四",
+    "王五"
+  ],
   "password": "",
   "allpoint": 20,
   "onepoint": 10,
@@ -56,6 +60,15 @@ ___
   "mainidea": 0,
   "onceadd": 1,
   "color": "rgb(0,85,255);",
+  "outTime": 180,
+  "maxOutTime": 180,
+  "remember": [
+    {
+      "USER": "19216800101",
+      "NAME": "%NAME%",
+      "photoUrl": "https://edu.seewo.com/res/head/1/default.png"
+    }
+  ],
   "0000-00-00": [
     {
       "time": 1600000000,

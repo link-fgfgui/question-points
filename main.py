@@ -13,7 +13,7 @@ from PyQt5 import QtNetwork, QtWidgets, QtCore, QtGui, QtMultimedia
 
 QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
 app = QtWidgets.QApplication(sys.argv)
-serverName = 'question-point'
+serverName = 'question-points'
 socket = QtNetwork.QLocalSocket()
 socket.connectToServer(serverName)
 if socket.waitForConnected(500):
