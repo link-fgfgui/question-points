@@ -22,7 +22,7 @@ localServer = QtNetwork.QLocalServer()
 localServer.listen(serverName)
 s = requests.session()
 s.mount('https://', requests.adapters.HTTPAdapter(
-    max_retries=requests.packages.urllib3.util.Retry(total=5, method_whitelist=frozenset(['GET', 'POST']))))
+    max_retries=requests.packages.urllib3.util.Retry(total=5, allowed_methods=frozenset(['GET', 'POST']))))
 
 if os.name == 'nt':
     file = os.environ['APPDATA'].replace('\\', '/') + '/question-points'
@@ -660,7 +660,7 @@ class Ui_loginForm(QtWidgets.QWidget):
         font.setFamily("汉仪文黑-85W")
         font.setPointSize(10)
         self.labeltip.setFont(font)
-        self.labeltip.setStyleSheet("color: rgb(255, 0, 0);")
+        self.labeltip.setStyleSheet("color: rgb(255, 0, 0);border-radius: 10px;")
         self.labeltip.setText("")
         self.labeltip.setObjectName("labeltip")
         self.frame_2 = QtWidgets.QFrame(self.frame)
@@ -681,7 +681,7 @@ class Ui_loginForm(QtWidgets.QWidget):
         font.setFamily("汉仪文黑-85W")
         font.setPointSize(20)
         self.listWidget.setFont(font)
-        self.listWidget.setStyleSheet("color: rgb(255, 255, 255);border-radius: 10px;")
+        self.listWidget.setStyleSheet("color: rgb(255, 255, 255);")
         self.listWidget.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.listWidget.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.listWidget.setObjectName("listWidget")
@@ -902,9 +902,9 @@ class MESSAGEBOX(QtWidgets.QMessageBox):
         self.setIconPixmap(QtGui.QPixmap('./config/information.png').scaled(50, 50))
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Drawer)
         self.sound = QtMultimedia.QSoundEffect()
-        self.sound.setSource(QtCore.QUrl.fromLocalFile('./config/MessageOut.wav'))
+        self.sound.setSource(QtCore.QUrl.fromLocalFile('./config/35316.wav'))
         self.sound.setLoopCount(1)
-        self.sound.setVolume(50)
+        self.sound.setVolume(0.2)
 
     def TIP(self, txt: str, ti: int):
         self.setText(txt)
@@ -960,7 +960,7 @@ class MyQSTI(QtWidgets.QSystemTrayIcon):
         sys.exit(0)
 
 
-class Ui_Form_float(QtWidgets.QWidget):
+class Ui_Form_float(QtWidgets.QPushButton):
     def __init__(self):
         super(Ui_Form_float, self).__init__()
         self.setupUi(self)
@@ -969,30 +969,28 @@ class Ui_Form_float(QtWidgets.QWidget):
         self._tracking = False
         self.anim = None
         self.m_flag = False
+        self.t=None
 
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(150, 150)
-        Form.setMinimumSize(QtCore.QSize(150, 150))
-        Form.setMaximumSize(QtCore.QSize(150, 150))
+        Form.resize(116, 116)
+        Form.setMinimumSize(QtCore.QSize(116, 116))
+        Form.setMaximumSize(QtCore.QSize(116, 116))
         Form.setGeometry(1700, dk.availableGeometry().height() - 170, 150, 150)
         Form.setWindowOpacity(0.7)
         Form.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
         Form.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.pushButton = QtWidgets.QPushButton(Form)
-        self.pushButton.setGeometry(QtCore.QRect(20, 20, 116, 116))
-        self.pushButton.setMinimumSize(QtCore.QSize(116, 116))
-        self.pushButton.setMaximumSize(QtCore.QSize(116, 116))
-        self.pushButton.setStyleSheet(
+        self.setStyleSheet(
             "QPushButton{image: url(./config/question.png);border-radius: 57px;background-color: rgb(255, 255, 255);}QPushButton:pressed {background-color: rgb(139, 139, 139);}")
-        self.pushButton.setText("")
-        self.pushButton.setObjectName("pushButton")
-        self.pushButton.clicked.connect(showui)
+        self.setText("")
+        self.clicked.connect(showui)
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def mousePressEvent(self, event):
+
         if event.button() == QtCore.Qt.LeftButton:
+            self.t=time.perf_counter()
             self.m_flag = True
             self.m_Position = event.globalPos() - self.pos()  # 获取鼠标相对窗口的位置
             event.accept()
@@ -1004,6 +1002,8 @@ class Ui_Form_float(QtWidgets.QWidget):
             QMouseEvent.accept()
 
     def mouseReleaseEvent(self, QMouseEvent):
+        if (time.perf_counter()-self.t)<0.1:
+            self.click()
         self.m_flag = False
         self.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
 
@@ -1578,7 +1578,7 @@ class Thread_1(QtCore.QThread):
                 qmut_2.unlock()
             for d in inglist:
                 if (time.perf_counter() - d['start'] - waittime >= maxtime) and (not waitcode):
-                    print(d)
+                    # print(d)
                     qmut_2.lock()
                     tex = '请 {}、{} 组回到教室！'.format(d['tea'] , d['stu'])
                     xuan = inglist.index(d)
@@ -1592,9 +1592,9 @@ class Thread_1(QtCore.QThread):
             for d in outTimeList:
                 if (time.perf_counter() - d['out'] - waittime >= maxOutTime) and (not waitcode):
                     qmut_2.lock()
-                    xuan = inglist.index(d)
-                    inglist.remove(d)
-                    ui.ingList.takeItem(xuan)
+                    xuan = outTimeList.index(d)
+                    outTimeList.remove(d)
+                    ui.outTimeList.takeItem(xuan)
                     self.res = s.post(
                         url=f"https://care.seewo.com/app/apis.json?action=STUDENT_SET_MEDAL_SINGLE&timestamp={int(time.time() * 1000 // 1)}&isAjax=1",
                         data=json.dumps({"action": "STUDENT_SET_MEDAL_SINGLE",
@@ -1678,9 +1678,9 @@ class Thread_2(QtCore.QThread):
                     if len(hitokoto) < 20:
                         hitokoto = ('  ' * 10) + hitokoto
                     ui.hitokoto_label.setText(hitokoto)
-                    ui.hitokoto_label.setToolTip(hitokoto_dic['uuid'])
+                    ui.hitokoto_label.setToolTip(hitokoto_dic['uuid']+" | Made By hitokoto.cn")
                     flForm.label.setText(hitokoto)
-                    flForm.label.setToolTip(hitokoto_dic['uuid'])
+                    flForm.label.setToolTip(hitokoto_dic['uuid']+" | Made By hitokoto.cn")
                     break
                 except:
                     pass
@@ -1930,8 +1930,6 @@ thread_2.exit()
 thread_1.exit()
 if os.name == 'nt':  # UPDATE
     res = requests.get('https://link-fgfgui.github.io/question-points/update.json').json()
-
-
     def checkup(length, ver, res=requests.get('https://link-fgfgui.github.io/question-points/update.json').json()):
         for i in range(length):
             try:
