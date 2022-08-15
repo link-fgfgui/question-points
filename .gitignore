@@ -1,5 +1,7 @@
 .idea/
 nsis/
+main.build/
+main.dist/
 GUI 气球弹出.mp3
 mediaFrom.txt
 fontsetting.txt
@@ -8,3 +10,4 @@ fontsetting.txt
 *.qrc
 ZhanKuKuaiLeTi.ttf
 test.py
+icon.ico
